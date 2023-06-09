@@ -102,7 +102,6 @@ class SIP{
             message = Parser.parse(message);
         }
         var response = Builder.DigestResponse(this.username, this.password, this.realm, this.nonce, message.method, `${message.requestUri}`);
-        console.log(message)
         message.headers.CSeq = `${this.cseq_count[message.method]} ${message.method}`;
         message.headers['Authorization'] = `Digest username="${this.username}", realm="${this.realm}", nonce="${this.nonce}", uri="${message.requestUri}", response="${response}", algorithm=MD5`;
         return Builder.Build(message)
@@ -139,36 +138,31 @@ Client.createDialog(initialRequest).then(dialog => {
 
     dialog.on('200', (res) => {
         console.log("REGISTERED")
-        call();
+        //call("420");
+        call("69");
     })
 })
 
-var call = () => {
-    var invite_request = new SIPTransaction(Client, "INVITE", {extension:"69"}).create();
+var call = (extension) => {
+    var invite_request = new SIPTransaction(Client, "INVITE", {extension:extension}).create();
     Client.createDialog(invite_request).then(dialog => {
         dialog.on('401', (res) => {
             res = Parser.parse(res);
-            console.log('INVITE 401')
             var extractHeaderParams = Parser.extractHeaderParams(res.headers['WWW-Authenticate']);
             Client.nonce = extractHeaderParams.nonce;
             Client.realm = extractHeaderParams.realm;
             var a = Client.AuthorizeMessage(invite_request);
-            console.log(a)
+            console.log(`authorize message for ${extension}`)
             dialog.send(a)
         })
 
         dialog.on('200', (res) => {
-            console.log('SPAGHETTI4')
+            console.log(`Answered ${extension}`)
         })
 
         dialog.on('180', (res) => {
-            console.log("Ringing")
+            console.log(`Ringing ${extension}`)
         })
     })
 }
 
-//Client.REGISTER().then(res => {
-//    Client.INVITE(69).then(res => {
-//        console.log(res);
-//    })
-//})
