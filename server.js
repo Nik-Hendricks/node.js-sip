@@ -1,4 +1,5 @@
 const dgram = require("dgram");
+const net = require("net");
 const crypto = require("crypto");
 const Builder = require("./Builder");
 const Parser = require("./Parser");
@@ -58,6 +59,7 @@ class SIP{
         this.callId = generateCallid();
         this.Events = [];
         this.cseq_count = {REGISTER: 1, INVITE: 1, ACK: 1}
+        this.SipMessageProps = []
         return this;
     }
 
@@ -74,109 +76,99 @@ class SIP{
         })
     }
 
-    listen(){
-        this.Socket.on("message", (message) => {
-            var response = message.toString();
-            var type = Parser.getResponseType(response);
-            if(this.Events.length > 0){
-                this.Events.forEach(event => {
-                    if(event.event == type){
-                        //console.log(Parser.parse(response));
-                        event.callback(Parser.parse(response));
-                    }
-                })
-            }
-        })
+    on(ref, event, callback){
+        //need to add event matching to match the event to the dialog
+        //this will allow for multiple dialogs to be created and used at the same time
+
+        this.Events.push({ref: ref, event: event, callback: callback});
     }
 
-    on(event, callback){
-        this.Events.push({event: event, callback: callback});
-    }
 
-    start(){
+    register(){
         return new Promise(resolve => {
-            this.listen();
             var register_transaction = new SIPTransaction(this, "REGISTER", {}).create();
             this.send(register_transaction).then(response => {
                 if(!response.error){
-                    this.on("482", (res) => {
-                        console.log("Loop Detected")
-                        console.log(res)
-                    })
-
-                    this.on("401", (res) => {
-                        console.log("401 Unauthorized")
-                        console.log(res)
-                        var cseq = res.headers.CSeq;
-                        var req;
-                        if(cseq == "1 REGISTER"){
-                            if (res.headers['WWW-Authenticate']) {
-                                var parsed_params = Parser.extractHeaderParams(res.headers['WWW-Authenticate']);
-                                this.realm = parsed_params.realm;
-                                this.nonce = parsed_params.nonce;                     
-                                req = new SIPTransaction(this, "REGISTER", {}).create();
-                            }
-                        }else if (cseq == "1 INVITE"){
-                            if (res.headers['WWW-Authenticate']) {
-                                var parsed_params = Parser.extractHeaderParams(res.headers['WWW-Authenticate']);
-                                this.realm = parsed_params.realm;
-                                this.nonce = parsed_params.nonce;                  
-                                req = new SIPTransaction(this, "INVITE", {extension:"420"}).create();            
-                            }
-                        }
-
-                        this.send(req).then(res => {
-                                    
-                        })
-
-                    })
-
-                    this.on("200", (res) => {
-                        var cseq = res.headers.CSeq;
-                        if(cseq.includes("REGISTER")){
-                            this.nonce = "";
-                            this.realm = "";
-                            console.log("REGISTERED")
-
-                        }else if(cseq.includes("INVITE")){
-                            console.log("INVITED")
-                        }
-                        resolve({context: this, 'success':'success'})
-                    })
-
-                    this.on('180', (res) => {
-                        console.log("Ringing")
-                    })
-
-                    this.on("INVITE", (res) => {
-                        console.log(res);
-                    })
-
-                    this.on("NOTIFY", (res) => {
-                        //console.log(res);
-                        this.send('SIP/2.0 200 OK\r\n\r\n')
-                    })
-
+                    resolve({context: this, 'success':'success'})
                 } else {
                     resolve({context: this, 'error': res.error})
                 }
             })
         })
     }
+
+    AuthorizeMessage(message){
+        if(typeof message == "string"){
+            message = Parser.parse(message);
+        }
+        var response = Builder.DigestResponse(this.username, this.password, this.realm, this.nonce, message.method, `${message.requestUri}`);
+        console.log(message)
+        message.headers.CSeq = `${this.cseq_count[message.method]} ${message.method}`;
+        message.headers['Authorization'] = `Digest username="${this.username}", realm="${this.realm}", nonce="${this.nonce}", uri="${message.requestUri}", response="${response}", algorithm=MD5`;
+        return Builder.Build(message)
+    }
+
+    setup_listeners(){
+
+    }
+
+    createDialog(message){
+        return new Promise(resolve => {
+            var dialog = new Dialog({context: this, initialRequest: message}).then(dialog => {
+                resolve(dialog);
+            })
+        })
+    }
+
 }
 
-new SIP(asteriskIP, asteriskPort, username, password).start().then(res => {
+var Client = new SIP(asteriskIP, asteriskPort, username, password);
 
-    var invite_request = new SIPTransaction(res.context, "INVITE", {extension:"420"}).create();
+var initialRequest = new SIPTransaction(Client, "REGISTER", {}).create();
 
-
-    //want to make syntax like this
-
-    //
-
-
-    console.log(invite_request)
-    res.context.send(invite_request).then(res => {
-        
+Client.createDialog(initialRequest).then(dialog => {
+    dialog.on('401', (res) => {
+        console.log('REGISTER 401')
+        res = Parser.parse(res);
+        var extractHeaderParams = Parser.extractHeaderParams(res.headers['WWW-Authenticate']);
+        Client.nonce = extractHeaderParams.nonce;
+        Client.realm = extractHeaderParams.realm;
+        var a = Client.AuthorizeMessage(initialRequest);
+        dialog.send(a)
     })
-});
+
+    dialog.on('200', (res) => {
+        console.log("REGISTERED")
+        call();
+    })
+})
+
+var call = () => {
+    var invite_request = new SIPTransaction(Client, "INVITE", {extension:"69"}).create();
+    Client.createDialog(invite_request).then(dialog => {
+        dialog.on('401', (res) => {
+            res = Parser.parse(res);
+            console.log('INVITE 401')
+            var extractHeaderParams = Parser.extractHeaderParams(res.headers['WWW-Authenticate']);
+            Client.nonce = extractHeaderParams.nonce;
+            Client.realm = extractHeaderParams.realm;
+            var a = Client.AuthorizeMessage(invite_request);
+            console.log(a)
+            dialog.send(a)
+        })
+
+        dialog.on('200', (res) => {
+            console.log('SPAGHETTI4')
+        })
+
+        dialog.on('180', (res) => {
+            console.log("Ringing")
+        })
+    })
+}
+
+//Client.REGISTER().then(res => {
+//    Client.INVITE(69).then(res => {
+//        console.log(res);
+//    })
+//})

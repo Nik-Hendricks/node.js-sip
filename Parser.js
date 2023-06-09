@@ -87,17 +87,44 @@ const Parser = {
     },
 
     extractHeaderParams: (header) => {
-        const params = {};
-        const regex = /([^=\s]+)=("[^"]*"|[^,\s]+)/g;
-        let match;
-      
-        while ((match = regex.exec(header))) {
-          const key = match[1];
-          const value = match[2].replace(/"/g, '');
-          params[key] = value;
-        }
-      
-        return params;
+      const params = {};
+      const regex = /([^=\s]+)=("[^"]*"|[^,\s]+)/g;
+      let match;
+    
+      // Check if the header is wrapped in single quotes and remove them
+      if (header.startsWith("'") && header.endsWith("'")) {
+        header = header.slice(1, -1);
+      }
+    
+      while ((match = regex.exec(header))) {
+        const key = match[1];
+        const value = match[2].replace(/"/g, '');
+        params[key] = value;
+      }
+    
+      // Handle additional format: 'SIP/2.0/UDP 192.168.1.2:6111;branch=z9hG4bK5358096010232X2'
+      if (!Object.keys(params).length && header.includes(' ')) {
+        const spaceIndex = header.indexOf(' ');
+        const keyValue = header.slice(0, spaceIndex);
+        const rest = header.slice(spaceIndex + 1);
+    
+        const semicolonIndex = rest.indexOf(';');
+        const value = semicolonIndex !== -1 ? rest.slice(0, semicolonIndex) : rest;
+    
+        params[keyValue] = value;
+      }
+    
+      return params;
+    },
+
+    getBranch: (message) => {
+      message = (typeof message == "string") ? Parser.parse(message) : message;
+      return message.headers.Via.split(";")[1].split("=")[1];
+    },
+
+    getTag: (message) => {
+      message = (typeof message == "string") ? Parser.parse(message) : message;
+      return message.headers.From.split(";")[1].split("=")[1];
     },
 
     getResponseType: (message) => {
