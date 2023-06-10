@@ -127,6 +127,11 @@ const Parser = {
       return message.headers.From.split(";")[1].split("=")[1];
     },
 
+    getCseq: (message) => {
+      message = (typeof message == "string") ? Parser.parse(message) : message;
+      return Number(message.headers.CSeq.split(" ")[0]);
+    },
+
     getResponseType: (message) => {
         var response = message.split("\r\n")[0];
         if(response.split(" ")[0].includes("SIP/2.0")){

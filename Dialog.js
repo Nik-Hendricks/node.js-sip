@@ -11,9 +11,13 @@ class Dialog{
             this.context = props.context;
             this.initialRequest = (typeof props.initialRequest == "string") ? Parser.parse(props.initialRequest) : props.initialRequest;
             this.branchId;
-            this.start().then(res => {
-                resolve(this);
-            })
+            if(typeof this.initialRequest == "object" && typeof this.context == "object"){
+                this.start().then(res => {
+                    resolve(this);
+                })
+            }else{
+                resolve({error: "Dialog must be initialized with a context and an initial request."})
+            }
         })
     }
 
@@ -41,10 +45,17 @@ class Dialog{
     start(){
         return new Promise(resolve => {
             this.branchId = Parser.getBranch(this.initialRequest);
+            this.context.dialogs[this.branchId] = this;
             //send intial request to server through main SIP class socket.
             this.context.send(Builder.Build(this.initialRequest));
             resolve(this)
         })
+    }
+
+    kill(){
+        delete this.context.dialogs[this.branchId];
+        //here add logic to detect dialog type and send appropriate message to server.
+        
     }
 }
 
