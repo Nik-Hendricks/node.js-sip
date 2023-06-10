@@ -39,7 +39,7 @@ const Builder = {
                 'User-Agent': 'Node.js SIP Library',
                 'Content-Length': '0'
             },
-            body: ""
+            body: props.body
         }
 
         return res;
@@ -61,7 +61,7 @@ const Builder = {
                 'User-Agent': 'Node.js SIP Library',
                 'Content-Length': '0'
             },
-            body: ""
+            body: props.body
         }
 
         return res;
@@ -83,7 +83,29 @@ const Builder = {
                 'User-Agent': 'Node.js SIP Library',
                 'Content-Length': '0'
             },
-            body: ""
+            body: props.body
+        }
+
+        return res;
+    },
+
+    180: (props) => {
+        var res = {
+            method: "180",
+            requestUri: `sip:${props.extension}@${props.ip}`,
+            protocol: "SIP/2.0",
+            headers: {
+                'Via': `SIP/2.0/UDP ${props.client_ip}:${props.client_port};branch=${props.branchId}`,
+                'From': `<sip:${props.username}@${props.ip}>;tag=${Builder.generateBranch()}`,
+                'To': `<sip:${props.extension}@${props.ip}>`,
+                'Call-ID': `${props.callId}@${props.client_ip}`,
+                'CSeq': `${props.cseq} 180`,
+                'Contact': `<sip:${props.username}@${props.client_ip}:${props.client_port}>`,
+                'Max-Forwards': '70',
+                'User-Agent': 'Node.js SIP Library',
+                'Content-Length': '0'
+            },
+            body: props.body
         }
 
         return res;
@@ -94,7 +116,8 @@ const Builder = {
             "REGISTER": Builder.register(props),
             "INVITE": Builder.invite(props),
             "BYE": Builder.bye(props),
-            "200": Builder['200'](props)
+            "200": Builder['200'](props),
+            "180": Builder['180'](props),
         }
         return Builder.Build(map[type]);
     },

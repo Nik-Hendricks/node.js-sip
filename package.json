@@ -11,6 +11,12 @@
   "license": "ISC",
   "dependencies": {
     "asterisk-manager": "^0.2.0",
-    "ip": "^1.1.8"
+    "ffmpeg": "^0.0.4",
+    "fluent-ffmpeg": "^2.1.2",
+    "ip": "^1.1.8",
+    "mic": "^2.1.2",
+    "node-record-lpcm16": "^1.0.1",
+    "node-rtp": "^0.1.1",
+    "rtp": "^0.1.0"
   }
 }

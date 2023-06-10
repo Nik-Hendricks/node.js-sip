@@ -3,6 +3,7 @@ const net = require("net");
 const crypto = require("crypto");
 const Builder = require("./Builder");
 const Parser = require("./Parser");
+const SDPParser = require("./SDPParser");
 const Dialog = require("./Dialog");
 const clientIP = require("ip").address();
 
@@ -17,7 +18,7 @@ class SIPMessage{
         this.context = context;
         this.type = type;
         this.props = props;
-
+        this.body = (typeof this.props.body == "string") ? this.props.body : "";
         this.callID = (typeof this.props.callID == "string") ? this.props.callID : Builder.generateBranch();
         this.cseq = (typeof this.props.cseq_count !== "undefined") ? Number(this.props.cseq_count) : 1;
         this.branchId = (typeof this.props.branchId == "string") ? this.props.branchId : Builder.generateBranch();
@@ -35,6 +36,7 @@ class SIPMessage{
         this.props.password = this.context.password;
         this.props.ip = this.context.ip;
         this.props.port = this.context.port;
+        this.props.body = this.body;
         this.message = Builder.BuildResponse(this.type, this.props);
         return this;
     }
@@ -106,6 +108,9 @@ class SIP{
         })
     }
 
+    Message(type, props){
+        return new SIPMessage(this, type, props);
+    }
 }
 
 
