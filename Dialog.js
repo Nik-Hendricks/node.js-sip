@@ -25,9 +25,9 @@ class Dialog{
         //here we will match the request with the dialog and then call the appropriate function.
         this.context.Socket.on('message', (message) => {
             message = message.toString();
-            var paresedMessage = Parser.parse(message);
+            var parsedMessage = Parser.parse(message);
             if((Parser.getBranch(message) == this.branchId) && Parser.getResponseType(message) == event){
-                callback(message);
+                callback(parsedMessage);
             };
         })
     }
@@ -55,7 +55,7 @@ class Dialog{
     kill(){
         delete this.context.dialogs[this.branchId];
         //here add logic to detect dialog type and send appropriate message to server.
-        
+
     }
 }
 

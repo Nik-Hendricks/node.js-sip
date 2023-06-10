@@ -6,11 +6,11 @@ const Builder = {
             requestUri: `sip:${props.ip}:${props.port}`,
             protocol: "SIP/2.0",
             headers: {
-                'Via': `SIP/2.0/UDP ${props.client_ip}:${props.client_port};branch=${Builder.generateBranch()}`,
+                'Via': `SIP/2.0/UDP ${props.client_ip}:${props.client_port};branch=${props.branchId}`,
                 'From': `<sip:${props.username}@${props.ip}>;tag=${Builder.generateBranch()}`,
                 'To': `<sip:${props.username}@${props.ip}>`,
                 'Call-ID': `${props.callId}@${props.client_ip}`,
-                'CSeq': `${props.cseq_count['REGISTER']} REGISTER`,
+                'CSeq': `${props.cseq} REGISTER`,
                 'Contact': `<sip:${props.username}@${props.client_ip}:${props.client_port}>`,
                 'Max-Forwards': '70',
                 'Expires': '3600',
@@ -20,9 +20,6 @@ const Builder = {
             body: ""
         }
 
-        if(props.realm && props.nonce && props.realm != "" && props.nonce != ""){
-            res.headers["Authorization"] = `Digest username="${props.username}", realm="${props.realm}", nonce="${props.nonce}", uri="sip:${props.ip}:${props.port}", response="${Builder.DigestResponse(props.username, props.password, props.realm, props.nonce, "REGISTER", `sip:${props.ip}:${props.port}`)}"`
-        }
         return res;
     },
 
@@ -32,21 +29,17 @@ const Builder = {
             requestUri: `sip:${props.extension}@${props.ip}`,
             protocol: "SIP/2.0",
             headers: {
-                'Via': `SIP/2.0/UDP ${props.client_ip}:${props.client_port};branch=${Builder.generateBranch()}`,
+                'Via': `SIP/2.0/UDP ${props.client_ip}:${props.client_port};branch=${props.branchId}`,
                 'From': `<sip:${props.username}@${props.ip}>;tag=${Builder.generateBranch()}`,
                 'To': `<sip:${props.extension}@${props.ip}>`,
                 'Call-ID': `${props.callId}@${props.client_ip}`,
-                'CSeq': `${props.cseq_count['INVITE']} INVITE`,
+                'CSeq': `${props.cseq} INVITE`,
                 'Contact': `<sip:${props.username}@${props.client_ip}:${props.client_port}>`,
                 'Max-Forwards': '70',
                 'User-Agent': 'Node.js SIP Library',
                 'Content-Length': '0'
             },
             body: ""
-        }
-
-        if(props.realm && props.nonce && props.realm != "" && props.nonce != ""){
-            res.headers["Authorization"] = `Digest username="${props.username}", realm="${props.realm}", nonce="${props.nonce}", uri="sip:${props.extension}@${props.ip}:${props.port}", response="${Builder.DigestResponse(props.username, props.password, props.realm, props.nonce, "INVITE", `sip:${props.extension}@${props.ip}:${props.port}`)}"`
         }
 
         return res;
@@ -58,11 +51,33 @@ const Builder = {
             requestUri: `sip:${props.extension}@${props.ip}`,
             protocol: "SIP/2.0",
             headers: {
-                'Via': `SIP/2.0/UDP ${props.client_ip}:${props.client_port};branch=${Builder.generateBranch()}`,
+                'Via': `SIP/2.0/UDP ${props.client_ip}:${props.client_port};branch=${props.branchId}`,
                 'From': `<sip:${props.username}@${props.ip}>;tag=${Builder.generateBranch()}`,
                 'To': `<sip:${props.extension}@${props.ip}>`,
                 'Call-ID': `${props.callId}@${props.client_ip}`,
-                'CSeq': `${props.cseq_count['BYE']} BYE`,
+                'CSeq': `${props.cseq} BYE`,
+                'Contact': `<sip:${props.username}@${props.client_ip}:${props.client_port}>`,
+                'Max-Forwards': '70',
+                'User-Agent': 'Node.js SIP Library',
+                'Content-Length': '0'
+            },
+            body: ""
+        }
+
+        return res;
+    },
+
+    200: (props) => {
+        var res = {
+            method: "200",
+            requestUri: `sip:${props.extension}@${props.ip}`,
+            protocol: "SIP/2.0",
+            headers: {
+                'Via': `SIP/2.0/UDP ${props.client_ip}:${props.client_port};branch=${props.branchId}`,
+                'From': `<sip:${props.username}@${props.ip}>;tag=${Builder.generateBranch()}`,
+                'To': `<sip:${props.extension}@${props.ip}>`,
+                'Call-ID': `${props.callId}@${props.client_ip}`,
+                'CSeq': `${props.cseq} 200`,
                 'Contact': `<sip:${props.username}@${props.client_ip}:${props.client_port}>`,
                 'Max-Forwards': '70',
                 'User-Agent': 'Node.js SIP Library',
@@ -78,11 +93,13 @@ const Builder = {
         var map = {
             "REGISTER": Builder.register(props),
             "INVITE": Builder.invite(props),
-            "BYE": Builder.bye(props)
+            "BYE": Builder.bye(props),
+            "200": Builder['200'](props)
         }
         return Builder.Build(map[type]);
     },
 
+    //takes an object and returns a string.
     Build(obj) {
         if(!obj.isResponse){
             obj.isResponse = false;

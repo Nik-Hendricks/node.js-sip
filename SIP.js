@@ -17,19 +17,40 @@ class SIPMessage{
         this.context = context;
         this.type = type;
         this.props = props;
+
+        this.callID = (typeof this.props.callID == "string") ? this.props.callID : Builder.generateBranch();
+        this.cseq = (typeof this.props.cseq_count !== "undefined") ? Number(this.props.cseq_count) : 1;
+        this.branchId = (typeof this.props.branchId == "string") ? this.props.branchId : Builder.generateBranch();
+
         return this;
     }
 
     create(){
         this.props.client_ip = this.context.client_ip;
         this.props.client_port = this.context.client_port;
-        this.props.callId = this.context.callId;
-        this.props.cseq_count = this.context.cseq_count;
+        this.props.callId = this.callID;
+        this.props.branchId = this.branchId;
+        this.props.cseq = this.cseq;
         this.props.username = this.context.username;
         this.props.password = this.context.password;
         this.props.ip = this.context.ip;
         this.props.port = this.context.port;
-        return Builder.BuildResponse(this.type, this.props);
+        this.message = Builder.BuildResponse(this.type, this.props);
+        return this;
+    }
+
+    Authorize(challenge_response){
+        var message = (typeof this.message == "string") ? Parser.parse(this.message) : this.message;
+        challenge_response = (typeof challenge_response == "string") ? Parser.parse(challenge_response) : challenge_response;
+        
+        var extractHeaderParams = Parser.extractHeaderParams(challenge_response.headers['WWW-Authenticate']);
+        var nonce = extractHeaderParams.nonce;
+        var realm = extractHeaderParams.realm;
+        var response = Builder.DigestResponse(this.context.username, this.context.password, realm, nonce, message.method, `${message.requestUri}`);
+        
+        message.headers.CSeq = `${Parser.getCseq(message) + 1} ${message.method}`;
+        message.headers['Authorization'] = `Digest username="${this.context.username}", realm="${realm}", nonce="${nonce}", uri="${message.requestUri}", response="${response}", algorithm=MD5`;
+        return Builder.Build(message) //build message from object.
     }
 
 }
@@ -71,28 +92,13 @@ class SIP{
                 //here we could just access this.dialogs and then pass the message to a function there.
             }else{
                 if(Parser.getResponseType(message) == event){
-                    callback(message);
+                    callback(parsedMessage);
                 };
             }
         })
     }
 
-
-    AuthorizeMessage(message, challenge_response){
-        message = (typeof message == "string") ? Parser.parse(message) : message;
-        challenge_response = (typeof challenge_response == "string") ? Parser.parse(challenge_response) : challenge_response;
-        
-        var extractHeaderParams = Parser.extractHeaderParams(challenge_response.headers['WWW-Authenticate']);
-        var nonce = extractHeaderParams.nonce;
-        var realm = extractHeaderParams.realm;
-        var response = Builder.DigestResponse(this.username, this.password, realm, nonce, message.method, `${message.requestUri}`);
-        
-        message.headers.CSeq = `${Parser.getCseq(message) + 1} ${message.method}`;
-        message.headers['Authorization'] = `Digest username="${this.username}", realm="${realm}", nonce="${nonce}", uri="${message.requestUri}", response="${response}", algorithm=MD5`;
-        return Builder.Build(message) //build message from object.
-    }
-
-    createDialog(message){
+    Dialog(message){
         return new Promise(resolve => {
             var dialog = new Dialog({context: this, initialRequest: message}).then(dialog => {
                 resolve(dialog);

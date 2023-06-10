@@ -127,6 +127,11 @@ const Parser = {
       return message.headers.From.split(";")[1].split("=")[1];
     },
 
+    getCallId: (message) => {
+      message = (typeof message == "string") ? Parser.parse(message) : message;
+      return message.headers['Call-ID'].split("@")[0];
+    },
+
     getCseq: (message) => {
       message = (typeof message == "string") ? Parser.parse(message) : message;
       return Number(message.headers.CSeq.split(" ")[0]);
