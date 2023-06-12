@@ -1,15 +1,15 @@
-#SIP Library
+# SIP Library
 This is a Node.js library that provides functionality for working with the Session Initiation Protocol (SIP). It allows you to send and receive SIP messages, register a SIP client, and handle SIP dialogs.
 
-##Features
-1.Send and receive SIP messages using UDP protocol.
-2.Register a SIP client with a SIP server.
-3.Handle SIP dialogs and events.
-4.Generate and parse SIP messages.
+## Features
+1. Send and receive SIP messages using UDP protocol.
+2. Register a SIP client with a SIP server.
+3. Handle SIP dialogs and events.
+4. Generate and parse SIP messages.
 
-##Prerequisites
+## Prerequisites
 Node.js installed on your system.
-##Installation
+## Installation
 To use this library in your Node.js project, you need to follow these steps:
 
 Clone the repository or download the source code.
@@ -19,7 +19,7 @@ Install the required dependencies by running the following command:
 npm install
 ```
 
-##Usage
+## Usage
 To use the SIP library in your Node.js application, follow these steps:
 
 Import the SIP class from the library:
@@ -65,7 +65,7 @@ sipClient.on('401', response => {
 });
 ```
 
-##Examples
+## Examples
 The following examples demonstrate how to use the SIP library:
 
 **Sending a SIP Message:**
@@ -95,8 +95,8 @@ sipClient.Register()
 
 ```
 
-##Contributing
+## Contributing
 Contributions are welcome! If you have any bug reports, feature requests, or suggestions, please open an issue on the GitHub repository.
 
-License
+## License
 This library is licensed under the MIT License.
