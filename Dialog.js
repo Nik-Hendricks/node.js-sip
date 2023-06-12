@@ -4,20 +4,31 @@
 //on the implementation side, we should then be able to create a dialog and then register event handlers for the different SIP messages that we expect to receive.
 const Builder = require("./Builder");
 const Parser = require("./Parser");
+const SIPMessage = require("./SIPMessage");
 
 class Dialog{
-    constructor(props){
+    //constructor(props){
+    //    return new Promise(resolve => {
+    //        this.context = props.context;
+    //        this.initialRequest = (typeof props.initialRequest == "string") ? Parser.parse(props.initialRequest) : props.initialRequest;
+    //        this.branchId;
+    //        if(typeof this.initialRequest == "object" && typeof this.context == "object"){
+    //            this.start().then(res => {
+    //                resolve(this);
+    //            })
+    //        }else{
+    //            resolve({error: "Dialog must be initialized with a context and an initial request."})
+    //        }
+    //    })
+    //}
+
+    constructor(message){
         return new Promise(resolve => {
-            this.context = props.context;
-            this.initialRequest = (typeof props.initialRequest == "string") ? Parser.parse(props.initialRequest) : props.initialRequest;
-            this.branchId;
-            if(typeof this.initialRequest == "object" && typeof this.context == "object"){
-                this.start().then(res => {
-                    resolve(this);
-                })
-            }else{
-                resolve({error: "Dialog must be initialized with a context and an initial request."})
-            }
+            this.context = message.context;
+            this.message = message;
+            this.start().then(res => {
+                resolve(this);
+            })
         })
     }
 
@@ -27,7 +38,8 @@ class Dialog{
             message = message.toString();
             var parsedMessage = Parser.parse(message);
             if((Parser.getBranch(message) == this.branchId) && Parser.getResponseType(message) == event){
-                callback(parsedMessage);
+                var sipMessage = this.context.Message(parsedMessage);
+                callback(sipMessage);
             };
         })
     }
@@ -44,10 +56,10 @@ class Dialog{
 
     start(){
         return new Promise(resolve => {
-            this.branchId = Parser.getBranch(this.initialRequest);
+            this.branchId = Parser.getBranch(this.message.message);
             this.context.dialogs[this.branchId] = this;
             //send intial request to server through main SIP class socket.
-            this.context.send(Builder.Build(this.initialRequest));
+            this.context.send(Builder.Build(this.message.message));
             resolve(this)
         })
     }

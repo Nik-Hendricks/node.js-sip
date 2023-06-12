@@ -138,13 +138,16 @@ const Parser = {
     },
 
     getResponseType: (message) => {
-        var response = message.split("\r\n")[0];
-        if(response.split(" ")[0].includes("SIP/2.0")){
-            return response.split(" ")[1];
-        }else{
-            return response.split(" ")[0];
-        }
-        return response;
+        message = (typeof message == "string") ? Parser.parse(message) : message;
+        return (typeof message.statusCode == "undefined") ? message.method : message.statusCode;
+    },
+
+    isSipMessage(message) {
+      // Regular expression pattern to match SIP message format
+      const sipMessagePattern = /^(?:[A-Z]+)\s(?:sip|sips):\/{2}(?:[^\s:@]+)(?::\d+)?@(?:[^\s:@]+\.)+(?:[a-zA-Z]{2,})(?:\?[\S]*)?(?:\s(?:SIP\/\d\.\d))?\r\n(?:[^\r\n]+\r\n)*(?:\r\n(?:[^\r\n]+))*$/;
+    
+      // Check if the message matches the SIP message pattern
+      return sipMessagePattern.test(message);
     }
 }
 
