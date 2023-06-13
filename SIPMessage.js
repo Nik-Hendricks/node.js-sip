@@ -1,31 +1,18 @@
 const Parser = require('./Parser');
 const Builder = require('./Builder');
+const SDPParser = require('./SDPParser');
 
 class SIPMessage{
-    //constructor(context, type, props){
-    //    this.context = context;
-    //    this.type = type;
-    //    this.props = props;
-    //    this.body = (typeof this.props.body == "string") ? this.props.body : "";
-    //    this.callID = (typeof this.props.callID == "string") ? this.props.callID : Builder.generateBranch();
-    //    this.cseq = (typeof this.props.cseq_count !== "undefined") ? Number(this.props.cseq_count) : 1;
-    //    this.branchId = (typeof this.props.branchId == "string") ? this.props.branchId : Builder.generateBranch();
-//
-    //    return this;
-    //}
-
     constructor(context, obj){
         this.context = context;
-        this.message = obj;
+        this.message = (typeof obj == "string") ? Parser.parse(obj) : obj;
+        this.branchId = Parser.getBranch(this.message);
+        this.callId = Parser.getCallId(this.message);
+        this.cseq = Parser.getCseq(this.message);
+        this.challenge = this.ExtractChallenge();
+    
         return this;
     }
-
-
-    /*
-    BuildResponse({
-
-    })
-    */
 
     BuildResponse(type){
         var responses = {
@@ -46,7 +33,7 @@ class SIPMessage{
         var res = {
             isResponse: true,
             method: type,
-            requestUri: responses[Number(type)],
+            requestUri: `${type} ${responses[Number(type)]}`,
             protocol: "SIP/2.0",
             headers: {
                 'Via': `SIP/2.0/UDP ${props.client_ip}:${props.client_port};branch=${props.branchId}`,
@@ -61,17 +48,20 @@ class SIPMessage{
     }
 
     ExtractChallenge(){
-        console.log(this.message)
-        return Parser.extractHeaderParams(this.message.headers['WWW-Authenticate']);
+        return (typeof this.message.headers['WWW-Authenticate'] !== "undefined") ? Parser.extractHeaderParams(this.message.headers['WWW-Authenticate']) : null;
+    }
+
+    GetCallId(){
+        return Parser.getCallId(this.message);
+    }
+
+    ParseSDP(){
+        return SDPParser.parse(this.message.body);
     }
 
     Authorize(challenge_response){
         var message = (typeof this.message == "string") ? Parser.parse(this.message) : this.message;
         challenge_response = (typeof challenge_response == "string") ? Parser.parse(challenge_response) : challenge_response;
-
-        
-
-
         var extractHeaderParams = challenge_response.ExtractChallenge();
         var nonce = extractHeaderParams.nonce;
         var realm = extractHeaderParams.realm;
@@ -79,7 +69,7 @@ class SIPMessage{
         
         message.headers.CSeq = `${Parser.getCseq(message) + 1} ${message.method}`;
         message.headers['Authorization'] = `Digest username="${this.context.username}", realm="${realm}", nonce="${nonce}", uri="${message.requestUri}", response="${response}", algorithm=MD5`;
-        return Builder.Build(message) //build message from object.
+        return message //build message from object.
     }
 }
 

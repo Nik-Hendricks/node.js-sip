@@ -17,25 +17,10 @@ let callId;
 
 
 var Client = new SIP(asteriskIP, asteriskPort, username, password);
-//
-//var initialRequest = Client.Message("REGISTER", {}).create();
-//Client.Dialog(initialRequest.message).then(dialog => {
-//    dialog.on('401', (res) => {
-//        console.log('REGISTER 401')
-//        console.log(res)
-//        var a = initialRequest.Authorize(res.message); //generate authorized message from the original invite request
-//        dialog.send(a)
-//    })
-//
-//    dialog.on('200', (res) => {
-//        console.log("REGISTERED")
-//        //call("420");
-//        //call("69");
-//    })
-//})
+
 Client.Register().then(dialog => {
     console.log("REGISTERED")
-    call("420");
+    call("69");
 })
 
 //receive a call
@@ -99,6 +84,8 @@ var call = (extension) => {
     })
 
     Client.Dialog(message).then(dialog => {
+        
+        
         dialog.on('401', (res) => {
             var a = message.Authorize(res); //generate authorized message from the original invite request
             console.log(`authorize message for ${extension}`)
@@ -107,17 +94,14 @@ var call = (extension) => {
 
         dialog.on('200', (res) => {
             console.log(`200 OK ext: ${extension}`)
-            var SDP = SDPParser.parse(res.body)
-            console.log(SDP)
-            console.log(SDP.media[0].attributes)
-            media = new MediaStream('../audio.mp3', SDP)
-            media.start()
+            console.log(res.ParseSDP())
+            //media.start()
         })
 
         dialog.on('INVITE', (res) => {
             console.log(`INVITE from ${extension}`)
-            media = new MediaStream(res.body)
-            media.start()
+            console.log(res.ParseSDP())
+            //media.start()
         })
 
         dialog.on('180', (res) => {

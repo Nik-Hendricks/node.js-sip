@@ -7,6 +7,7 @@ const SDPParser = require("./SDPParser");
 const Dialog = require("./Dialog");
 const clientIP = require("ip").address();
 const SIPMessage = require("./SIPMessage");
+const Transaction = require("./Transaction");
 
 
 const generateCallid = () => {
@@ -28,12 +29,14 @@ class SIP{
         this.Socket = dgram.createSocket("udp4");
         this.callId = generateCallid();
         this.Events = [];
-        this.cseq_count = {REGISTER: 1, INVITE: 1, ACK: 1}
-        this.dialogs = {};
+        this.dialogs = [];
+        this.transactions = []
         return this;
     }
 
     send(message){
+        message = (typeof message == "object") ? Builder.Build(message.message) : message;
+        console.log(message)
         return new Promise(resolve => {
             this.Socket.send(message, 0, message.length, this.port, this.ip, (error) => {
                 if(error){
@@ -47,14 +50,17 @@ class SIP{
 
     on(event, callback){
         this.Socket.on('message', (message) => {
+
             message = message.toString();
             var parsedMessage = Parser.parse(message);
-            if(Object.keys(this.dialogs).includes(Parser.getBranch(message))){
+            var sipMessage = this.Message(parsedMessage);
+
+            if(Object.keys(this.dialogs).includes(sipMessage.branchId)){
                 //here we could just access this.dialogs and then pass the message to a function there.
+                console.log(this.dialogs[sipMessage.branchId])
             }else{
                 if(Parser.getResponseType(message) == event){
                     //convert the message to a SIPMessage object.
-                    var sipMessage = new SIPMessage(parsedMessage);
                     callback(sipMessage);
                 };
             }
@@ -62,6 +68,7 @@ class SIP{
     }
 
     Dialog(message){
+        console.log("NEW DIALOG HERE" + message)
         return new Promise(resolve => {
             var dialog = new Dialog(message).then(dialog => {
                 resolve(dialog);
@@ -73,12 +80,12 @@ class SIP{
         return new SIPMessage(this, message);
     }
 
+    Transaction(message){
+        return new Transaction(this, message);
+    }
+
     Register(){
         return new Promise(resolve => {
-            
-            //create a new register message.
-            //will be super verbose here
-            //build function will be used as it takes an object and returns a string.
             var message = this.Message({
                 isResponse: false,
                 protocol: "SIP/2.0",
@@ -97,6 +104,13 @@ class SIP{
                 },
                 body: ''
             })
+
+            //this.Transaction(message).then(response => {
+            //    //will return either a response or a dialog.
+            //    console.log(response);
+//
+            //})
+
 
             this.Dialog(message).then(dialog => {
                 dialog.on('401', (res) => {

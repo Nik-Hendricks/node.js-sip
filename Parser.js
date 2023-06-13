@@ -118,7 +118,7 @@ const Parser = {
     },
 
     getBranch: (message) => {
-      message = (typeof message == "string") ? Parser.parse(message) : message;
+      message = (typeof message == "string") ? Parser.parse(message.message) : message;
       return message.headers.Via.split(";")[1].split("=")[1];
     },
 
