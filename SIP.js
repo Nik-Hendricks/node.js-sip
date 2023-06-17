@@ -16,7 +16,11 @@ const generateCallid = () => {
 };
 
 
-
+class Listener{
+    constructor(){
+        
+    }
+}
 
 class SIP{
     constructor(ip, port, username, password){
@@ -28,46 +32,76 @@ class SIP{
         this.password = password;
         this.Socket = dgram.createSocket("udp4");
         this.callId = generateCallid();
-        this.Events = [];
+        this.events = [];
         this.dialogs = [];
         this.transactions = []
+        this.message_stack = [];
         return this;
     }
 
-    send(message){
-        message = (typeof message == "object") ? Builder.Build(message.message) : message;
-        return new Promise(resolve => {
-            this.Socket.send(message, 0, message.length, this.port, this.ip, (error) => {
-                if(error){
-                    resolve({context: this, 'error': error})
-                } else {
-                    resolve({context: this, 'success':'success'});
+    send(message) {
+        message = typeof message.message !== 'undefined' ? message : this.Message(message);
+        var constructed_message = typeof message === 'object' ? Builder.Build(message.message) : message;
+        return new Promise((resolve, reject) => { // Add reject parameter
+            console.log("_______Constructed Message_______")
+            console.log(constructed_message)
+            this.Socket.send(constructed_message, 0, constructed_message.length, this.port, this.ip, (error) => {
+                if (!error) {
+                    if (typeof this.message_stack[message.branchId] == 'undefined') {
+                        this.message_stack[message.branchId] = [message];
+                    } else {
+                        this.message_stack[message.branchId].push(message);
+                    }
                 }
-            })
-        })
+            });
+        });
+    }
+      
+    DialogExists(branchId){
+        return Object.keys(this.dialogs).includes(branchId);
     }
 
     on(event, callback){
-        this.Socket.on('message', (message) => {
+        this.events[event] = callback;
+    }
 
-            message = message.toString();
-            var parsedMessage = Parser.parse(message);
-            var sipMessage = this.Message(parsedMessage);
-
-            if(Object.keys(this.dialogs).includes(sipMessage.branchId)){
-                //here we could just access this.dialogs and then pass the message to a function there.
-                console.log(this.dialogs[sipMessage.branchId])
-            }else{
-                if(Parser.getResponseType(message) == event){
-                    //convert the message to a SIPMessage object.
-                    callback(sipMessage);
-                };
-            }
-        })
+    Listen() {
+        return new Promise((resolve) => {
+            this.Socket.on('message', (res_message) => {
+                res_message = res_message.toString();
+                var sipMessage = this.Message(res_message);
+                var message_ev = sipMessage.message.isResponse ? String(sipMessage.message.statusCode) : sipMessage.message.method;
+                if (Object.keys(this.dialogs).includes(sipMessage.branchId)) {
+                    if (sipMessage.isResponse) {
+                        resolve(sipMessage);
+                    } else {
+                        if (Object.keys(this.dialogs).includes(sipMessage.branchId)) {
+                            var d = this.dialogs[sipMessage.branchId];
+                            if (Object.keys(d.events).includes(message_ev)) {
+                                d.events[message_ev](sipMessage);
+                            }
+                            resolve(d);
+                        }
+                    }
+                }else{
+                    if (typeof this.message_stack[sipMessage.branchId] == 'undefined') {
+                        this.message_stack[sipMessage.branchId] = [sipMessage];
+                    } else {
+                        this.message_stack[sipMessage.branchId].push(sipMessage);
+                    }
+                    if (Object.keys(this.events).includes(message_ev)) {
+                        this.events[message_ev](sipMessage);
+                    }
+                    this.Dialog(this.message_stack[sipMessage.branchId][0]).then((dialog) => {
+                            resolve(dialog);
+                    })
+                    
+                }
+            })
+        });
     }
 
     Dialog(message){
-        console.log("NEW DIALOG HERE" + message)
         return new Promise(resolve => {
             var dialog = new Dialog(message).then(dialog => {
                 resolve(dialog);
@@ -104,17 +138,12 @@ class SIP{
                 body: ''
             })
 
-            //this.Transaction(message).then(response => {
-            //    //will return either a response or a dialog.
-            //    console.log(response);
-//
-            //})
+            this.send(message)
 
-
-            this.Dialog(message).then(dialog => {
+            var d = this.Dialog(message).then(dialog => {
                 dialog.on('401', (res) => {
                     var a = message.Authorize(res); //generate authorized message from the original invite request
-                    dialog.send(a)
+                    this.send(a)
                 })
 
                 dialog.on('200', (res) => {

@@ -14,7 +14,7 @@ class SIPMessage{
         return this;
     }
 
-    BuildResponse(type){
+    CreateResponse(type){
         var responses = {
             100: 'Trying',
             180: 'Ringing',
@@ -30,21 +30,24 @@ class SIPMessage{
             503: 'Service Unavailable',
             504: 'Server Time-out',
         }
+        this.cseq++;
         var res = {
             isResponse: true,
             method: type,
-            requestUri: `${type} ${responses[Number(type)]}`,
+            requestUri: `SIP/2.0 ${type} ${responses[Number(type)]}`,
             protocol: "SIP/2.0",
             headers: {
-                'Via': `SIP/2.0/UDP ${props.client_ip}:${props.client_port};branch=${props.branchId}`,
-                'From': `<sip:${props.username}@${props.ip}>;tag=${Builder.generateBranch()}`,
-                'To': `<sip:${props.extension}@${props.ip}>`,
-                'Call-ID': `${props.callId}@${props.client_ip}`,
-                'CSeq': `${props.cseq} 180`,
-                'Contact': `<sip:${props.username}@${props.client_ip}:${props.client_port}>`,
+                'Via': `SIP/2.0/UDP ${this.context.client_ip}:${this.context.client_port};branch=${this.branchId}`,
+                'From': `<sip:${this.context.username}@${this.context.ip}>;tag=${Builder.generateBranch()}`,
+                'To': `<sip:69@${this.context.ip}>`,
+                'Call-ID': `${this.callId}@${this.context.client_ip}`,
+                'CSeq': `${this.cseq} ${this.message.method}`,
+                'Contact': `<sip:${this.context.username}@${this.context.client_ip}:${this.context.client_port}>`,
                 'Max-Forwards': '70',
-            }
+            },
+            body:''
         }
+        return new SIPMessage(this.context, res);
     }
 
     ExtractChallenge(){
