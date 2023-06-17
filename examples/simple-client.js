@@ -5,17 +5,20 @@ const Parser = require("../Parser.js");
 const RTP = require("../RTP.js");
 const MediaStream = require("../Media.js");
 const Builder = require("../Builder.js");
+require('dotenv').config({ path: 'CONFIG.env' });
 
-const asteriskDOMAIN = "64.227.16.15";
-const asteriskIP = "64.227.16.15";
-const asteriskPort = 6111;
-const clientIP = "192.168.1.2";
-const clientPort = 6111;
-const username = "Rob";
-const password = "Marge23";
+const asteriskDOMAIN = process.env.ASTERISK_DOMAIN;
+const asteriskIP = process.env.ASTERISK_IP;
+const asteriskPort = process.env.ASTERISK_PORT;
+const clientIP = process.env.CLIENT_IP;
+const clientPort = process.env.CLIENT_PORT;
+const username = process.env.USERNAME;
+const password = process.env.PASSWORD;
 let callId;
 
-
+console.log(username)
+console.log(asteriskIP)
+console.log(asteriskPort)
 var Client = new SIP(asteriskIP, asteriskPort, username, password);
 
 Client.Register().then(dialog => {

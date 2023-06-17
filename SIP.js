@@ -36,7 +36,6 @@ class SIP{
 
     send(message){
         message = (typeof message == "object") ? Builder.Build(message.message) : message;
-        console.log(message)
         return new Promise(resolve => {
             this.Socket.send(message, 0, message.length, this.port, this.ip, (error) => {
                 if(error){
