@@ -25,7 +25,7 @@ class Dialog{
     }
 
     send(message){
-        this.message.context.send(message);
+        this.message.context.send(message, this.message.GetIdentity());
     }
 
     kill(){

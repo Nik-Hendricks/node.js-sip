@@ -19,6 +19,7 @@ class SIPMessage{
             100: 'Trying',
             180: 'Ringing',
             200: 'OK',
+            302: 'Moved Temporarily',
             401: 'Unauthorized',
             407: 'Proxy Authentication Required',
             408: 'Request Timeout',
@@ -35,7 +36,6 @@ class SIPMessage{
         r.isResponse = true;
         r.method = type;
         r.requestUri = `${type} ${responses[Number(type)]}`;
-        r.Contact = `<sip:${this.context.username}@${this.context.client_ip}:${this.context.client_port}>`;
 
         return r
     }
@@ -50,6 +50,26 @@ class SIPMessage{
 
     ParseSDP(){
         return SDPParser.parse(this.message.body);
+    }
+
+    GetIdentity(){
+        return {
+            username: this.message.headers.From.match(/<sip:(.*)@/)[1],
+            ip: this.message.headers.From.match(/@(.*)>/)[1],
+            port: this.message.headers.Via.split(' ')[1].split(':')[1].split(';')[0]
+        }
+    }
+
+    GetAuthCredentials(){
+        if(typeof this.message.headers.Authorization !== "undefined"){
+            return {
+                username: this.message.headers.From.match(/<sip:(.*)@/)[1],
+                password: this.message.headers.Authorization.match(/response="(.*)"/)[1],
+                nonce: this.message.headers.Authorization.match(/nonce="(.*)"/)[1],
+            }
+        }else{
+            return {error: "No Authorization header found"};
+        }
     }
 
     Authorize(challenge_response){

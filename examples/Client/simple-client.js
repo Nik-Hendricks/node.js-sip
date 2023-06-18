@@ -1,10 +1,10 @@
-const SIP = require("../SIP.js");
-const SIPMessage = require("../SIPMessage.js");
-const SDPParser = require("../SDPParser.js");
-const Parser = require("../Parser.js");
-const RTP = require("../RTP.js");
-const MediaStream = require("../Media.js");
-const Builder = require("../Builder.js");
+const SIP = require("../../SIP.js");
+const SIPMessage = require("../../SIPMessage.js");
+const SDPParser = require("../../SDPParser.js");
+const Parser = require("../../Parser.js");
+const RTP = require("../../RTP.js");
+const MediaStream = require("../../Media.js");
+const Builder = require("../../Builder.js");
 require('dotenv').config({ path: 'CONFIG.env' });
 
 const asteriskDOMAIN = process.env.ASTERISK_DOMAIN;
@@ -15,7 +15,7 @@ const clientPort = process.env.CLIENT_PORT;
 const username = process.env.USERNAME;
 const password = process.env.PASSWORD;
 let callId;
-var Client = new SIP(asteriskIP, asteriskPort, username, password);
+var Client = new SIP({ip: asteriskIP, port: asteriskPort, username: username, password: password, client_ip: clientIP, client_port: clientPort})
 
 
 
@@ -35,26 +35,50 @@ Client.Register().then(dialog => {
 })
 
 //receive a call
+//Client.on('INVITE', (res) => {
+//    console.log("Received INVITE")
+//    var d = Client.Dialog(res).then(dialog => {
+//        console.log("RESPONSE")
+//        dialog.send(res.CreateResponse(100))
+//        dialog.send(res.CreateResponse(180))
+//        dialog.send(res.CreateResponse(200))
+//
+//        console.log(res.ParseSDP())
+//        
+//        dialog.on('BYE', (res) => {
+//            console.log("BYE")
+//            dialog.send(res.CreateResponse(200))
+//            dialog.kill()
+//        })
+//
+//        
+//
+//    })
+//})
+
 Client.on('INVITE', (res) => {
-    console.log("Received INVITE")
+    console.log("Received INVITE");
+
+    // Determine the new target location (extension) for redirection
+    var newExtension = `730@${asteriskIP}`;
+    
+    // Create a SIP 302 Moved Temporarily response
+    var redirectResponse = res.CreateResponse(302);
+    redirectResponse.headers.Contact = `<sip:${newExtension}>`;
+
+    // Send the redirect response
     var d = Client.Dialog(res).then(dialog => {
-        console.log("RESPONSE")
-        dialog.send(res.CreateResponse(100))
-        dialog.send(res.CreateResponse(180))
-        dialog.send(res.CreateResponse(200))
-
-        console.log(res.ParseSDP())
-        
+        dialog.send(redirectResponse);
+        // Optionally, you can send additional provisional responses (e.g., 180 Ringing) if desired
+        dialog.send(res.CreateResponse(180));
+   
         dialog.on('BYE', (res) => {
-            console.log("BYE")
-            dialog.send(res.CreateResponse(200))
-            dialog.kill()
-        })
-
-        
-
-    })
-})
+            console.log("BYE");
+            dialog.send(res.CreateResponse(200));
+            dialog.kill();
+        });
+    });
+});
 
 
 //function to make a call

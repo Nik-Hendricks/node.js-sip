@@ -8,6 +8,8 @@ const Dialog = require("./Dialog");
 const clientIP = require("ip").address();
 const SIPMessage = require("./SIPMessage");
 const Transaction = require("./Transaction");
+const os = require("os");
+
 
 
 const generateCallid = () => {
@@ -23,13 +25,14 @@ class Listener{
 }
 
 class SIP{
-    constructor(ip, port, username, password){
-        this.ip = ip;
-        this.client_ip = clientIP;
-        this.client_port = 5060;
-        this.port = port;
-        this.username = username;
-        this.password = password;
+    constructor(props){
+        props = (typeof props !== 'undefined') ? props : {};
+        this.ip = (typeof props.ip !== 'undefined') ? props.ip : "";
+        this.client_ip = (typeof props.client_ip !== 'undefined') ? props.client_ip : "";
+        this.client_port = (typeof props.client_port !== 'undefined') ? props.client_port : 5060;
+        this.port = (typeof props.port !== 'undefined') ? props.port : 5060;
+        this.username = (typeof props.username !== 'undefined') ? props.username : "";
+        this.password = (typeof props.password !== 'undefined') ? props.password : "";
         this.Socket = dgram.createSocket("udp4");
         this.callId = generateCallid();
         this.events = [];
@@ -39,15 +42,19 @@ class SIP{
         return this;
     }
 
-    send(message) {
+    send(message, identity) {
+        identity = (typeof identity !== 'undefined') ? identity : {ip: this.ip, port: this.port};
         message = typeof message.message !== 'undefined' ? message : this.Message(message);
         var constructed_message = typeof message === 'object' ? Builder.Build(message.message) : message;
-        return new Promise((resolve, reject) => { // Add reject parameter
+        return new Promise((resolve) => {
             console.log("_______Constructed Message_______")
             console.log(constructed_message)
-            this.Socket.send(constructed_message, 0, constructed_message.length, this.port, this.ip, (error) => {
+            console.log(identity)
+            this.Socket.send(constructed_message, 0, constructed_message.length, Number(identity.port), identity.ip, (error) => {
                 if (!error) {
                     this.push_to_stack(message);
+                }else{
+                    console.log(error)
                 }
             });
         });
@@ -70,35 +77,36 @@ class SIP{
     }
 
     Listen() {
-        return new Promise((resolve) => {
-            this.Socket.on('message', (res_message) => {
-                res_message = res_message.toString();
-                var sipMessage = this.Message(res_message);
-                var message_ev = sipMessage.message.isResponse ? String(sipMessage.message.statusCode) : sipMessage.message.method;
-                if (Object.keys(this.dialogs).includes(sipMessage.branchId)) {
-                    if (sipMessage.isResponse) {
-                        resolve(sipMessage);
-                    } else {
-                        if (Object.keys(this.dialogs).includes(sipMessage.branchId)) {
-                            var d = this.dialogs[sipMessage.branchId];
-                            if (Object.keys(d.events).includes(message_ev)) {
-                                d.events[message_ev](sipMessage);
-                            }
-                            resolve(d);
+        var ret;
+        this.Socket.on('message', (res_message) => {
+            console.log("_______Received Message_______")
+            res_message = res_message.toString();
+            var sipMessage = this.Message(res_message);
+            var message_ev = sipMessage.message.isResponse ? String(sipMessage.message.statusCode) : sipMessage.message.method;
+            if (Object.keys(this.dialogs).includes(sipMessage.branchId)) {
+                if (sipMessage.isResponse) {
+                    ret = sipMessage
+                } else {
+                    if (Object.keys(this.dialogs).includes(sipMessage.branchId)) {
+                        var d = this.dialogs[sipMessage.branchId];
+                        if (Object.keys(d.events).includes(message_ev)) {
+                            d.events[message_ev](sipMessage);
                         }
+                        ret = d;
                     }
-                }else{
-                    this.push_to_stack(sipMessage);
-                    if (Object.keys(this.events).includes(message_ev)) {
-                        this.events[message_ev](sipMessage);
-                    }
-                    this.Dialog(this.message_stack[sipMessage.branchId][0]).then((dialog) => {
-                            resolve(dialog);
-                    })
-                    
                 }
-            })
-        });
+            }else{
+                this.push_to_stack(sipMessage);
+                if (Object.keys(this.events).includes(message_ev)) {
+                    this.events[message_ev](sipMessage);
+                }
+                this.Dialog(this.message_stack[sipMessage.branchId][0]).then((dialog) => {
+                        ret = dialog;
+                })
+                
+            }
+        })
+        setInterval(() => {}, 1000);
     }
 
     Dialog(message){
