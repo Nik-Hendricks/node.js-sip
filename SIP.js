@@ -47,14 +47,18 @@ class SIP{
             console.log(constructed_message)
             this.Socket.send(constructed_message, 0, constructed_message.length, this.port, this.ip, (error) => {
                 if (!error) {
-                    if (typeof this.message_stack[message.branchId] == 'undefined') {
-                        this.message_stack[message.branchId] = [message];
-                    } else {
-                        this.message_stack[message.branchId].push(message);
-                    }
+                    this.push_to_stack(message);
                 }
             });
         });
+    }
+
+    push_to_stack(message){
+        if (typeof this.message_stack[message.branchId] == 'undefined') {
+            this.message_stack[message.branchId] = [message];
+        } else {
+            this.message_stack[message.branchId].push(message);
+        }
     }
       
     DialogExists(branchId){
@@ -84,11 +88,7 @@ class SIP{
                         }
                     }
                 }else{
-                    if (typeof this.message_stack[sipMessage.branchId] == 'undefined') {
-                        this.message_stack[sipMessage.branchId] = [sipMessage];
-                    } else {
-                        this.message_stack[sipMessage.branchId].push(sipMessage);
-                    }
+                    this.push_to_stack(sipMessage);
                     if (Object.keys(this.events).includes(message_ev)) {
                         this.events[message_ev](sipMessage);
                     }

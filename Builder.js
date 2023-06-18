@@ -160,7 +160,7 @@ const Builder = {
       
         // Add request line
         if (obj.isResponse) {
-          message += `${obj.protocol} 200 OK\r\n`;
+          message += `${obj.protocol} ${obj.requestUri}\r\n`;
         } else {
           message += `${obj.method} ${obj.requestUri} ${obj.protocol}\r\n`;
         }

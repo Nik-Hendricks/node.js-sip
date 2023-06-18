@@ -25,9 +25,6 @@ class Dialog{
     }
 
     send(message){
-        console.log("_______Sending Message_______")
-        console.log(message)
-        //WILL TAKE THE "message" param and put the appropriate branch id on it.
         this.message.context.send(message);
     }
 

@@ -17,6 +17,16 @@ const password = process.env.PASSWORD;
 let callId;
 var Client = new SIP(asteriskIP, asteriskPort, username, password);
 
+
+
+
+//should make transaction and dialog objects just behaviors of the SIP class.
+//you can use either one to send SIP messages.
+
+
+
+
+
 Client.Listen();
 
 Client.Register().then(dialog => {
@@ -29,10 +39,20 @@ Client.on('INVITE', (res) => {
     console.log("Received INVITE")
     var d = Client.Dialog(res).then(dialog => {
         console.log("RESPONSE")
+        dialog.send(res.CreateResponse(100))
+        dialog.send(res.CreateResponse(180))
+        dialog.send(res.CreateResponse(200))
 
-        dialog.send(res.CreateResponse(180));
-        dialog.send(res.CreateResponse(180));
-        dialog.send(res.CreateResponse(200));
+        console.log(res.ParseSDP())
+        
+        dialog.on('BYE', (res) => {
+            console.log("BYE")
+            dialog.send(res.CreateResponse(200))
+            dialog.kill()
+        })
+
+        
+
     })
 })
 
@@ -40,8 +60,6 @@ Client.on('INVITE', (res) => {
 //function to make a call
 var call = (extension) => {
     var media;
-    //var invite_request = Client.Message("INVITE", {extension:extension}).create();
-
     var message = Client.Message({
         isResponse: false,
         protocol: "SIP/2.0",
@@ -76,6 +94,8 @@ var call = (extension) => {
         dialog.on('200', (res) => {
             console.log(`200 OK ext: ${extension}`)
             console.log(res.ParseSDP())
+            //dialog.send(res.CreateResponse(''))
+            console.trace()
             //media.start()
         })
 
