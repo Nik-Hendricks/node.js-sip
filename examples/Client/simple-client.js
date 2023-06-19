@@ -60,7 +60,7 @@ Client.on('INVITE', (res) => {
     console.log("Received INVITE");
 
     // Determine the new target location (extension) for redirection
-    var newExtension = `730@${asteriskIP}`;
+    var newExtension = `73@${asteriskIP}`;
     
     // Create a SIP 302 Moved Temporarily response
     var redirectResponse = res.CreateResponse(302);

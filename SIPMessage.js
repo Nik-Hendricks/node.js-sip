@@ -41,6 +41,7 @@ class SIPMessage{
     }
 
     ExtractChallenge(){
+        console.log((typeof this.message.headers['WWW-Authenticate'] !== "undefined") ? Parser.extractHeaderParams(this.message.headers['WWW-Authenticate']) : null)
         return (typeof this.message.headers['WWW-Authenticate'] !== "undefined") ? Parser.extractHeaderParams(this.message.headers['WWW-Authenticate']) : null;
     }
 
@@ -53,14 +54,25 @@ class SIPMessage{
     }
 
     GetIdentity(){
+
+        var ip = this.message.headers.Contact.match(/@(.*)>/)[1].split(":")[0];
+        ip = (typeof ip == "undefined") ? this.message.headers.From.match(/@(.*)>/)[1].split(":")[0] : ip;
+
+        var port = this.message.headers.Contact.match(/@(.*)>/)[1].split(":")[1];
+        port = (typeof port == "undefined") ? this.message.headers.From.match(/@(.*)>/)[1].split(":")[1] : port;
+
+
+
         return {
             username: this.message.headers.From.match(/<sip:(.*)@/)[1],
-            ip: this.message.headers.From.match(/@(.*)>/)[1],
-            port: this.message.headers.Via.split(' ')[1].split(':')[1].split(';')[0]
+            ip: ip,
+            port: port,
         }
     }
 
     GetAuthCredentials(){
+        console.log(Parser.extractHeaderParams(this.message.headers.Via))
+        console.trace()
         if(typeof this.message.headers.Authorization !== "undefined"){
             return {
                 username: this.message.headers.From.match(/<sip:(.*)@/)[1],

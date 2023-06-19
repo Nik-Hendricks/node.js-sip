@@ -21,7 +21,6 @@ var users = {
 
 var Server = new SIP();
 Server.Listen()
-console.log(Server)
 Server.Socket.bind(6111, "192.168.1.2")
 
 
@@ -32,9 +31,8 @@ Server.Socket.bind(6111, "192.168.1.2")
 
 Server.on('REGISTER', (res) => {
     //extract username ip and port from request
-    console.log(res.GetIdentity())
-    console.log(res.GetAuthCredentials())
 
+    console.log(res.message)
     var d = Server.Dialog(res).then(dialog => {
         if(res.GetAuthCredentials().error){
             console.log("ERROR")
