@@ -14,35 +14,90 @@ var extensions = {
 }
 
 
-var users = {
-    'Rob':'1234',
-    'John':'4321',
+class User{
+    constructor(props){
+        props = (typeof props !== 'undefined') ? props : {};
+        this.username = (typeof props.username !== 'undefined') ? props.username : undefined;
+        this.password = (typeof props.password !== 'undefined') ? props.password : undefined;
+        this.ip = (typeof props.ip !== 'undefined') ? props.ip : undefined;
+        this.port = (typeof props.port !== 'undefined') ? props.port : undefined;
+    }
 }
 
-var Server = new SIP();
-Server.Listen()
-Server.Socket.bind(6111, "192.168.1.2")
 
+class Server{
+    constructor(){
+        this.SIP = new SIP({type: "server"});
+        this.SIP.Socket.bind(6111, "192.168.1.2")
+        this.SIP.Listen()
+        this.users = [];
+    }
 
-
-//should make transaction and dialog objects just behaviors of the SIP class.
-//you can use either one to send SIP messages.
-
-
-Server.on('REGISTER', (res) => {
-    //extract username ip and port from request
-
-    console.log(res.message)
-    var d = Server.Dialog(res).then(dialog => {
-        if(res.GetAuthCredentials().error){
-            console.log("ERROR")
-            res.message.headers['WWW-Authenticate'] = "Digest realm=\"NRegistrar\", nonce=\"1234\"";
-            dialog.send(res.CreateResponse(401), res.GetIdentity())
-        }else{
+    Start(){
+        this.SIP.on('REGISTER', (res) => {
+            console.log("REGISTER")
             console.log(res.GetAuthCredentials())
+            res.message.headers['CSeq'] = `${Parser.getCseq(res.message) + 1} REGISTER`;
+            res.message.headers.From = `<sip:NRegistrar@192.168.1.2:6111>;tag=${res.branchId}`
+            res.message.headers.Via = `SIP/2.0/UDP 192.168.1.2:6111;branch=${res.branchId}`
+            res.message.headers.From = `<sip:NRegistrar@192.168.1.2:6111>;tag=${res.branchId}`
+        
+            if(res.GetAuthCredentials().error){
+                console.log("ERROR")
+                res.message.headers['WWW-Authenticate'] = "Digest realm=\"NRegistrar\", nonce=\"1234abcd\" algorithm=\"MD5\"";
+                var d = this.SIP.dialog_stack[res.branchId]
+
+                d.on('REGISTER', (res) => {
+                    console.log("REGISTER LEVEL 2")
+
+                    if(!res.GetAuthCredentials().error){
+                        var contact = res.message.headers.Contact.match(/<sip:(.*)>/)[1];
+                        var username = contact.split(":")[0].split("@")[0];
+                        var ip = contact.split(":")[0].split("@")[1];
+                        var port = contact.split(":")[1].split(">")[0];
+                        
+                        if(this.users.hasOwnProperty(username)){
+                            console.log("USER EXISTS")
+                            this.SIP.send(res.CreateResponse(200), res.GetIdentity())
+                        }
+                    }
+                })
+
+                this.SIP.send(res.CreateResponse(401), res.GetIdentity())
+            }
+        })
+        
+        this.SIP.on('INVITE', (res) => {
+            //extract the extension from the request URI
+            
+        })
+    }
+
+    QueryContact(username){
+        for(var i in contacts){
+            if(contacts[i].username == username){
+                contacts[i].extension = extensions[username];
+                return contacts[i];
+            }
         }
-    })
-})
+    }
+
+    AddUser(props){
+        var user = new User(props);
+        this.users[user.username] = user;
+    }
+}
+
+
+
+var SIPServer = new Server();
+
+SIPServer.Start();
+SIPServer.AddUser({username: "Rob", password: "1234"})
+SIPServer.AddUser({username: "Tim", password: "1234"})
+
+
+
 
 //receive a call
 //Client.on('INVITE', (res) => {
@@ -66,31 +121,31 @@ Server.on('REGISTER', (res) => {
 //    })
 //})
 
-Server.on('INVITE', (res) => {
-    console.log("Received INVITE");
-
-    // Determine the new target location (extension) for redirection
-    var newExtension = `730@${asteriskIP}`;
-    
-    // Create a SIP 302 Moved Temporarily response
-    var redirectResponse = res.CreateResponse(302);
-    redirectResponse.headers.Contact = `<sip:${newExtension}>`;
-
-    // Send the redirect response
-    var d = Client.Dialog(res).then(dialog => {
-        dialog.send(redirectResponse);
-        // Optionally, you can send additional provisional responses (e.g., 180 Ringing) if desired
-        dialog.send(res.CreateResponse(180));
-   
-        dialog.on('BYE', (res) => {
-            console.log("BYE");
-            dialog.send(res.CreateResponse(200));
-            dialog.kill();
-        });
-    });
-});
-
-
+//Server.on('INVITE', (res) => {
+//    console.log("Received INVITE");
+//
+//    // Determine the new target location (extension) for redirection
+//    var newExtension = `730@${asteriskIP}`;
+//    
+//    // Create a SIP 302 Moved Temporarily response
+//    var redirectResponse = res.CreateResponse(302);
+//    redirectResponse.headers.Contact = `<sip:${newExtension}>`;
+//
+//    // Send the redirect response
+//    var d = Client.Dialog(res).then(dialog => {
+//        dialog.send(redirectResponse);
+//        // Optionally, you can send additional provisional responses (e.g., 180 Ringing) if desired
+//        dialog.send(res.CreateResponse(180));
+//   
+//        dialog.on('BYE', (res) => {
+//            console.log("BYE");
+//            dialog.send(res.CreateResponse(200));
+//            dialog.kill();
+//        });
+//    });
+//});
+//
+//
 //function to make a call
 var call = (extension) => {
     var media;
@@ -156,11 +211,3 @@ var call = (extension) => {
         })
     })
 }
-
-//setInterval(() => {
-//    console.log("____ CLIENT DIALOGS ____\n\n")
-//    console.log(Client.dialogs)
-//    console.log("\n\n")
-//    console.log("____ CLIENT TRANSACTIONS ____\n\n")
-//    console.log(Client.transactions)
-//}, 5000);

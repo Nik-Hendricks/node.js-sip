@@ -33,12 +33,13 @@ class SIP{
         this.port = (typeof props.port !== 'undefined') ? props.port : 5060;
         this.username = (typeof props.username !== 'undefined') ? props.username : "";
         this.password = (typeof props.password !== 'undefined') ? props.password : "";
+        this.type = (typeof props.type !== 'undefined') ? props.type : "client";
         this.Socket = dgram.createSocket("udp4");
         this.callId = generateCallid();
         this.events = [];
-        this.dialogs = [];
         this.transactions = []
         this.message_stack = [];
+        this.dialog_stack = [];
         return this;
     }
 
@@ -67,6 +68,10 @@ class SIP{
             this.message_stack[message.branchId].push(message);
         }
     }
+
+    push_to_dialog_stack(dialog){
+        this.dialog_stack[dialog.branchId] = dialog;
+    }
       
     DialogExists(branchId){
         return Object.keys(this.dialogs).includes(branchId);
@@ -81,30 +86,37 @@ class SIP{
         this.Socket.on('message', (res_message) => {
             console.log("_______Received Message_______")
             res_message = res_message.toString();
+            console.log(res_message)
             var sipMessage = this.Message(res_message);
             var message_ev = sipMessage.message.isResponse ? String(sipMessage.message.statusCode) : sipMessage.message.method;
-            if (Object.keys(this.dialogs).includes(sipMessage.branchId)) {
+            this.push_to_stack(sipMessage);
+            if (Object.keys(this.dialog_stack).includes(sipMessage.branchId)) {
                 if (sipMessage.isResponse) {
                     ret = sipMessage
                 } else {
-                    if (Object.keys(this.dialogs).includes(sipMessage.branchId)) {
-                        var d = this.dialogs[sipMessage.branchId];
-                        if (Object.keys(d.events).includes(message_ev)) {
-                            d.events[message_ev](sipMessage);
-                        }
-                        ret = d;
+                    var d = this.dialog_stack[sipMessage.branchId];
+                    console.log(d.events)
+                    if (Object.keys(d.events).includes(message_ev)) {
+                        d.events[message_ev](sipMessage);
                     }
+                    ret = d;
                 }
             }else{
-                this.push_to_stack(sipMessage);
+                //if(typeof this.events[message_ev] !== 'undefined'){
+                //    this.events[message_ev](sipMessage)
+                //}
+
+
+                //if there is not dialog for this message create one with the first message in the stack
+                this.Dialog(this.message_stack[sipMessage.branchId][0]).then((dialog) => {
+                        ret = dialog;
+                })    
+
                 if (Object.keys(this.events).includes(message_ev)) {
                     this.events[message_ev](sipMessage);
                 }
-                this.Dialog(this.message_stack[sipMessage.branchId][0]).then((dialog) => {
-                        ret = dialog;
-                })
-                
             }
+            return ret;
         })
         setInterval(() => {}, 1000);
     }
@@ -148,7 +160,7 @@ class SIP{
 
             this.send(message)
 
-            var d = this.Dialog(message).then(dialog => {
+            this.Dialog(message).then(dialog => {
                 dialog.on('401', (res) => {
                     var a = message.Authorize(res); //generate authorized message from the original invite request
                     this.send(a)

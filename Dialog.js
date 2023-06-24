@@ -11,9 +11,9 @@ class Dialog{
         return new Promise(resolve => {
             this.message = message;
             this.callId = message.GetCallId();
-            this.branchId = Parser.getBranch(this.message.message);
+            this.branchId = this.message.branchId
             this.events = {};
-            this.message.context.dialogs[this.branchId] = this;
+            this.message.context.push_to_dialog_stack(this);
             //send intial request to server through main SIP class socket.
 
             resolve(this)

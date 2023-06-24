@@ -17,7 +17,7 @@ const password = process.env.PASSWORD;
 let callId;
 var Client = new SIP({ip: asteriskIP, port: asteriskPort, username: username, password: password, client_ip: clientIP, client_port: clientPort})
 
-
+Client.Socket.bind(clientPort, "192.168.1.2")
 
 
 //should make transaction and dialog objects just behaviors of the SIP class.
@@ -31,7 +31,7 @@ Client.Listen();
 
 Client.Register().then(dialog => {
     console.log("REGISTERED")
-    //call("69");
+    call("201");
 })
 
 //receive a call
