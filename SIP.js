@@ -45,10 +45,9 @@ class SIP{
     send(message, identity) {
         identity = (typeof identity !== 'undefined') ? identity : {ip: this.ip, port: this.port};
         message = typeof message.message !== 'undefined' ? message : this.Message(message);
-        console.log(message.tag)
-        console.log('this is identity')
-        console.log(identity)
         var constructed_message = typeof message === 'object' ? Builder.Build(message.message) : message;
+        console.log('________Sending To__________')
+        console.log(identity)
         return new Promise((resolve) => {
             console.log("_______Constructed Message_______")
             console.log(constructed_message)
@@ -97,7 +96,6 @@ class SIP{
                         ret = sipMessage
                     } else {
                         var d = this.dialog_stack[sipMessage.tag];
-                        console.log(d.events)
                         if (Object.keys(d.events).includes(message_ev)) {
                             d.events[message_ev](sipMessage);
                         }
