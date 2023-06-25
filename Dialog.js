@@ -10,8 +10,8 @@ class Dialog{
     constructor(message){
         return new Promise(resolve => {
             this.message = message;
-            this.callId = message.GetCallId();
             this.branchId = this.message.branchId
+            this.tag = this.message.tag;
             this.events = {};
             this.message.context.push_to_dialog_stack(this);
             //send intial request to server through main SIP class socket.
@@ -25,11 +25,11 @@ class Dialog{
     }
 
     send(message){
-        this.message.context.send(message, this.message.GetIdentity());
+        this.message.context.send(message);
     }
 
     kill(){
-        delete this.message.context.dialogs[this.branchId];
+        delete this.message.context.dialogs[this.tag];
         //here add logic to detect dialog type and send appropriate message to server.
 
     }

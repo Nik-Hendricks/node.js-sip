@@ -46,11 +46,13 @@ class SIP{
     send(message, identity) {
         identity = (typeof identity !== 'undefined') ? identity : {ip: this.ip, port: this.port};
         message = typeof message.message !== 'undefined' ? message : this.Message(message);
+        console.log(message.tag)
+        console.log('this is identity')
+        console.log(identity)
         var constructed_message = typeof message === 'object' ? Builder.Build(message.message) : message;
         return new Promise((resolve) => {
             console.log("_______Constructed Message_______")
             console.log(constructed_message)
-            console.log(identity)
             this.Socket.send(constructed_message, 0, constructed_message.length, Number(identity.port), identity.ip, (error) => {
                 if (!error) {
                     this.push_to_stack(message);
@@ -62,19 +64,19 @@ class SIP{
     }
 
     push_to_stack(message){
-        if (typeof this.message_stack[message.branchId] == 'undefined') {
-            this.message_stack[message.branchId] = [message];
+        if (typeof this.message_stack[message.tag] == 'undefined') {
+            this.message_stack[message.tag] = [message];
         } else {
-            this.message_stack[message.branchId].push(message);
+            this.message_stack[message.tag].push(message);
         }
     }
 
     push_to_dialog_stack(dialog){
-        this.dialog_stack[dialog.branchId] = dialog;
+        this.dialog_stack[dialog.tag] = dialog;
     }
       
-    DialogExists(branchId){
-        return Object.keys(this.dialogs).includes(branchId);
+    DialogExists(tag){
+        return Object.keys(this.dialogs).includes(tag);
     }
 
     on(event, callback){
@@ -84,39 +86,36 @@ class SIP{
     Listen() {
         var ret;
         this.Socket.on('message', (res_message) => {
-            console.log("_______Received Message_______")
             res_message = res_message.toString();
-            console.log(res_message)
-            var sipMessage = this.Message(res_message);
-            var message_ev = sipMessage.message.isResponse ? String(sipMessage.message.statusCode) : sipMessage.message.method;
-            this.push_to_stack(sipMessage);
-            if (Object.keys(this.dialog_stack).includes(sipMessage.branchId)) {
-                if (sipMessage.isResponse) {
-                    ret = sipMessage
-                } else {
-                    var d = this.dialog_stack[sipMessage.branchId];
-                    console.log(d.events)
-                    if (Object.keys(d.events).includes(message_ev)) {
-                        d.events[message_ev](sipMessage);
+            if(res_message.length > 4){
+                console.log("_______Received Message_______")
+                console.log(res_message)
+                var sipMessage = this.Message(res_message);
+                var message_ev = sipMessage.message.isResponse ? String(sipMessage.message.statusCode) : sipMessage.message.method;
+                this.push_to_stack(sipMessage);
+                if (Object.keys(this.dialog_stack).includes(sipMessage.tag)) {
+                    if (sipMessage.isResponse) {
+                        ret = sipMessage
+                    } else {
+                        var d = this.dialog_stack[sipMessage.tag];
+                        console.log(d.events)
+                        if (Object.keys(d.events).includes(message_ev)) {
+                            d.events[message_ev](sipMessage);
+                        }
+                        ret = d;
                     }
-                    ret = d;
+                }else{
+                    //if there is not dialog for this message create one with the first message in the stack
+                    this.Dialog(this.message_stack[sipMessage.tag][0]).then((dialog) => {
+                            ret = dialog;
+                    })    
+
+                    if (Object.keys(this.events).includes(message_ev)) {
+                        this.events[message_ev](sipMessage);
+                    }
                 }
-            }else{
-                //if(typeof this.events[message_ev] !== 'undefined'){
-                //    this.events[message_ev](sipMessage)
-                //}
-
-
-                //if there is not dialog for this message create one with the first message in the stack
-                this.Dialog(this.message_stack[sipMessage.branchId][0]).then((dialog) => {
-                        ret = dialog;
-                })    
-
-                if (Object.keys(this.events).includes(message_ev)) {
-                    this.events[message_ev](sipMessage);
-                }
+                return ret;
             }
-            return ret;
         })
         setInterval(() => {}, 1000);
     }

@@ -17,7 +17,7 @@ const password = process.env.PASSWORD;
 let callId;
 var Client = new SIP({ip: asteriskIP, port: asteriskPort, username: username, password: password, client_ip: clientIP, client_port: clientPort})
 
-Client.Socket.bind(clientPort, "192.168.1.2")
+Client.Socket.bind(clientPort, clientIP)
 
 
 //should make transaction and dialog objects just behaviors of the SIP class.
@@ -31,54 +31,54 @@ Client.Listen();
 
 Client.Register().then(dialog => {
     console.log("REGISTERED")
-    call("201");
+    call('201')
 })
 
 //receive a call
-//Client.on('INVITE', (res) => {
-//    console.log("Received INVITE")
-//    var d = Client.Dialog(res).then(dialog => {
-//        console.log("RESPONSE")
-//        dialog.send(res.CreateResponse(100))
-//        dialog.send(res.CreateResponse(180))
-//        dialog.send(res.CreateResponse(200))
-//
-//        console.log(res.ParseSDP())
-//        
-//        dialog.on('BYE', (res) => {
-//            console.log("BYE")
-//            dialog.send(res.CreateResponse(200))
-//            dialog.kill()
-//        })
-//
-//        
-//
-//    })
-//})
-
 Client.on('INVITE', (res) => {
-    console.log("Received INVITE");
-
-    // Determine the new target location (extension) for redirection
-    var newExtension = `73@${asteriskIP}`;
-    
-    // Create a SIP 302 Moved Temporarily response
-    var redirectResponse = res.CreateResponse(302);
-    redirectResponse.headers.Contact = `<sip:${newExtension}>`;
-
-    // Send the redirect response
+    console.log("Received INVITE")
     var d = Client.Dialog(res).then(dialog => {
-        dialog.send(redirectResponse);
-        // Optionally, you can send additional provisional responses (e.g., 180 Ringing) if desired
-        dialog.send(res.CreateResponse(180));
-   
+        console.log("RESPONSE")
+        dialog.send(res.CreateResponse(100))
+        dialog.send(res.CreateResponse(180))
+        dialog.send(res.CreateResponse(200))
+
+        console.log(res.ParseSDP())
+        
         dialog.on('BYE', (res) => {
-            console.log("BYE");
-            dialog.send(res.CreateResponse(200));
-            dialog.kill();
-        });
-    });
-});
+            console.log("BYE")
+            dialog.send(res.CreateResponse(200))
+            dialog.kill()
+        })
+
+        
+
+    })
+})
+
+//Client.on('INVITE', (res) => {
+//    console.log("Received INVITE");
+//
+//    // Determine the new target location (extension) for redirection
+//    var newExtension = `420@${asteriskIP}`;
+//    
+//    // Create a SIP 302 Moved Temporarily response
+//    var redirectResponse = res.CreateResponse(302);
+//    redirectResponse.headers.Contact = `<sip:${newExtension}>`;
+//
+//    // Send the redirect response
+//    var d = Client.Dialog(res).then(dialog => {
+//        dialog.send(redirectResponse);
+//        // Optionally, you can send additional provisional responses (e.g., 180 Ringing) if desired
+//        dialog.send(res.CreateResponse(180));
+//   
+//        dialog.on('BYE', (res) => {
+//            console.log("BYE");
+//            dialog.send(res.CreateResponse(200));
+//            dialog.kill();
+//        });
+//    });
+//});
 
 
 //function to make a call
@@ -117,39 +117,23 @@ var call = (extension) => {
 
         dialog.on('200', (res) => {
             console.log(`200 OK ext: ${extension}`)
-            console.log(res.ParseSDP())
-            //dialog.send(res.CreateResponse(''))
-            console.trace()
-            //media.start()
+            dialog.send(res.CreateResponse(200))
         })
 
         dialog.on('INVITE', (res) => {
             console.log(`INVITE from ${extension}`)
-            console.log(res.ParseSDP())
             //media.start()
         })
 
         dialog.on('180', (res) => {
             console.log(`Ringing ${extension}`)
         })
-
-        dialog.on('BYE', (res) => {
-            console.log(`BYE from ${extension}`)
-            var p = {
-                extension: username,
-                branchId: Parser.getBranch(res),
-                callId: Parser.getCallId(res),
-                cseq: Parser.getCseq(res),
-            }
-            var ok_response = Client.Message("200", p).create();
-            dialog.send(ok_response.message);
-        })
     })
 }
 
 //setInterval(() => {
 //    console.log("____ CLIENT DIALOGS ____\n\n")
-//    console.log(Client.dialogs)
+//    console.log(Client.dialog_stack)
 //    console.log("\n\n")
 //    console.log("____ CLIENT TRANSACTIONS ____\n\n")
 //    console.log(Client.transactions)

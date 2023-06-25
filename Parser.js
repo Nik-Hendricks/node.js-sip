@@ -1,3 +1,188 @@
+const HeaderParser = {
+    parse: (headers) => {
+      // NOTE if you specify a key within the header object, the function will automatically return just the value of that key if it exists.
+      //an example is the CSeq header, which has a count and a method. If you specify the key as CSeq, the function will return an object with the count and method as keys.
+      var checks = {
+          "From": {contact: HeaderParser.Contact, tag: HeaderParser.Tag},
+          "To": {contact: HeaderParser.Contact, transport: HeaderParser.Transport, tag: HeaderParser.Tag},
+          "Contact": {contact: HeaderParser.Contact, transport: HeaderParser.Transport},
+          "Via": {uri: HeaderParser.URI, branch: HeaderParser.branchId},
+          "CSeq": {count: HeaderParser.Cseq, method: HeaderParser.Cseq},
+          "WWW-Authenticate": {realm: HeaderParser.Realm, nonce: HeaderParser.Nonce, algorithm: HeaderParser.Algorithm},
+          "Authorization": {realm: HeaderParser.Realm, username: HeaderParser.Username, algorithm: HeaderParser.Algorithm, nonce: HeaderParser.Nonce, response: HeaderParser.Response},
+          "Supported": HeaderParser.SpaceSeparated,
+          "Allow": HeaderParser.SpaceSeparated,
+      }
+      var ret = {}
+      for(var header in headers){
+          var h = headers[header];
+          if(typeof checks[header] !== "undefined"){
+              if(typeof checks[header] == "function"){
+                  ret[header] = checks[header](h);
+              }else{
+                  for(var check in checks[header]){
+                      var c = checks[header][check](h);
+                      if(c){
+                          if(typeof ret[header] == "undefined"){
+                              ret[header] = {}
+                          }
+                          if(typeof c == "object"){
+                              if(typeof c[check] !== "undefined"){
+                                  ret[header][check] = c[check];
+                              }else{
+                                  ret[header][check] = c;
+                              }
+                          }else{
+                              ret[header][check] = c;
+                          }
+                      }
+                  }
+              }
+          }
+
+      }
+      return ret;
+  },
+
+  branchId:(str) => {
+      if(str.indexOf("branch=") > -1){
+          var v = str.match(/branch=(.*)/)[1]
+          return (v.indexOf(";") > -1) ? v.split(";")[0] : v;
+      }else{
+          return false
+      }
+  },
+
+
+  FindKey(str, key){
+    //will match values such as "key=value","key="value" but also "key=value;key2=value2" or "key=value,key2="value2""
+
+    var regex = new RegExp(`${key}=(?:"([^"]*)"|([^,;]*))`, "g");
+    var match = regex.exec(str);
+    if(match !== null){
+        var ret = match[1] || match[2];
+        if(ret.indexOf(";") > -1){
+            ret = ret.split(";")[0];
+        }
+        if(ret.indexOf(":") > -1){
+          ret = ret.split(":")[0];
+        }
+        if(ret.indexOf(">") > -1){
+          ret = ret.split(">")[0];
+        }
+        return ret;
+
+    }else{
+        return false;
+    }
+  },
+
+  Username:(str) => {
+    if(str.indexOf("<sip:") > -1){
+      var v = str.match(/<sip:(.*)>/)[1];
+      if(v.indexOf(";") > -1){
+        v = v.split(";")[0];
+      }
+      if(v.indexOf(":") > -1){
+        v = v.split(":")[0];
+      }
+      if(v.indexOf("@") > -1){
+        v = v.split("@")[0];
+      }
+      return v;
+
+    }else{
+      return HeaderParser.FindKey(str, "username");
+    }
+  },
+
+  Algorithm:(str) => {
+      return HeaderParser.FindKey(str, "algorithm");
+  },
+
+  Nonce:(str) => {
+    return HeaderParser.FindKey(str, "nonce");
+  },
+
+  Tag:(str) => {
+    return HeaderParser.FindKey(str, "tag");
+  },
+
+  Realm:(str) => {
+    return HeaderParser.FindKey(str, "realm");
+  },
+
+  Response:(str) => {
+    return HeaderParser.FindKey(str, "response");
+  },
+
+  Transport:(str) => {
+    return HeaderParser.FindKey(str, "transport");
+  },
+
+  URI:(str) => {
+      var regex = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+)/;
+      var match = str.match(regex);
+      if(match !== null){
+          return {ip: match[1].split(":")[0], port: match[1].split(":")[1]}
+      }else{
+          return false;
+      }
+  },
+
+  Contact:(str) => {
+      if(str.indexOf("sip:") > -1){
+          var match = str.match(/<sip:(.*)>/)[1]
+          var username = HeaderParser.Username(str);
+          var v = HeaderParser.URI(match);
+          return {
+            ip: v.ip,
+            port: v.port,
+            username: username,
+          }
+      }else{
+          return false
+      }
+  },
+
+  Quoted:(str) => {
+      if(str.indexOf("\"") > -1){
+          return str.split("\"")
+      }else{
+          return false;
+      }
+  },
+
+  Cseq:(str) => {
+      var v = HeaderParser.SpaceSeparated(str)
+      if(v){
+          return { count: v[0], method: v[1] }
+      }else{
+          return false;
+      }
+  },
+
+  SpaceSeparated:(str) => {
+      if(str.indexOf(" ") > -1){
+          return str.split(" ")
+      }else{
+          return false;
+      }
+  },
+
+  getQuotedValues:(str) => {
+      const regex = /([^=\s]+)\s*=\s*(?:"([^"]*)"|([^,;]*))/g;
+      let match;
+      while ((match = regex.exec(str))) {
+        const key = match[1];
+        const value = match[2] || match[3];
+        console.log(`Key: ${key}, Value: ${value}`);
+      }
+  },
+
+}
+
+
 const Parser = {
     parse: (message) => {
         const lines = message.split('\r\n');
@@ -74,7 +259,6 @@ const Parser = {
       
           // Parse message body if it exists
           const body = lines.slice(index + 1).join('\r\n');
-      
           return {
             isResponse: false,
             method,
@@ -84,6 +268,10 @@ const Parser = {
             body,
           };
         }
+    },
+
+    ParseHeaders(headers){
+      return HeaderParser.parse(headers);
     },
 
     extractHeaderParams: (header) => {

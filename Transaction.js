@@ -3,7 +3,6 @@ class Transaction{
         return new Promise(resolve => {
             this.context = message.context;
             this.message = message;
-            this.callId = message.GetCallId();
             this.start().then(res => {
                 resolve(this);
             })
