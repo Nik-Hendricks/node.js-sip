@@ -60,7 +60,6 @@ class SIPMessage{
 
     }
 
-
     GetAuthCredentials(){
         if(typeof this.message.headers.Authorization !== "undefined"){
             return {
