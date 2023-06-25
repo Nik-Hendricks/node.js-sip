@@ -9,50 +9,27 @@ const SIPMessage = require("./SIPMessage");
 class Dialog{
     constructor(message){
         return new Promise(resolve => {
-            this.context = message.context;
             this.message = message;
             this.callId = message.GetCallId();
-            this.start().then(res => {
-                resolve(this);
-            })
-        })
-    }
-
-    on(event, callback){
-        //here we will match the request with the dialog and then call the appropriate function.
-        this.context.Socket.on('message', (message) => {
-            message = message.toString();
-            var parsedMessage = Parser.parse(message);
-            var sipMessage = this.context.Message(parsedMessage);
-            if((sipMessage.branchId == this.branchId) && Parser.getResponseType(message) == event){
-                var sipMessage = this.context.Message(parsedMessage);
-                callback(sipMessage);
-            };
-        })
-    }
-
-    send(message){
-        if(typeof message == "object"){
-            message = Builder.Build(message);
-        }
-        return new Promise(resolve => {
-            this.context.send(message);
-            resolve(this);
-        })
-    }
-
-    start(){
-        return new Promise(resolve => {
-            this.branchId = Parser.getBranch(this.message.message);
-            this.context.dialogs[this.branchId] = this;
+            this.branchId = this.message.branchId
+            this.events = {};
+            this.message.context.push_to_dialog_stack(this);
             //send intial request to server through main SIP class socket.
-            this.context.send(this.message);
+
             resolve(this)
         })
     }
 
+    on(event, callback){
+        this.events[event] = callback;
+    }
+
+    send(message){
+        this.message.context.send(message, this.message.GetIdentity());
+    }
+
     kill(){
-        delete this.context.dialogs[this.branchId];
+        delete this.message.context.dialogs[this.branchId];
         //here add logic to detect dialog type and send appropriate message to server.
 
     }
