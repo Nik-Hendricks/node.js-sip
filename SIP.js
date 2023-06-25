@@ -5,7 +5,6 @@ const Builder = require("./Builder");
 const Parser = require("./Parser");
 const SDPParser = require("./SDPParser");
 const Dialog = require("./Dialog");
-const clientIP = require("ip").address();
 const SIPMessage = require("./SIPMessage");
 const Transaction = require("./Transaction");
 const os = require("os");

@@ -56,21 +56,8 @@ class SIPMessage{
     }
 
     GetIdentity(){
+        return this.headers.Contact.contact
 
-        var ip = this.message.headers.Contact.match(/@(.*)>/)[1].split(":")[0];
-        ip = (typeof ip == "undefined") ? this.message.headers.From.match(/@(.*)>/)[1].split(":")[0] : ip;
-
-        var port = this.message.headers.Contact.match(/@(.*)>/)[1].split(":")[1];
-        port = (typeof port == "undefined") ? this.message.headers.From.match(/@(.*)>/)[1].split(":")[1] : port;
-        if(port.indexOf(";") > -1){
-            port = port.split(";")[0];
-        }
-
-        return {
-            username: this.message.headers.From.match(/<sip:(.*)@/)[1],
-            ip: ip,
-            port: port,
-        }
     }
 
 

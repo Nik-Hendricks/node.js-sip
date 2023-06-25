@@ -132,7 +132,7 @@ const HeaderParser = {
 
   Contact:(str) => {
       if(str.indexOf("sip:") > -1){
-          var match = str.match(/<sip:(.*)>/)[1]
+          var match = str.match(/sip:(.*)/)[1]
           var username = HeaderParser.Username(str);
           var v = HeaderParser.URI(match);
           return {
