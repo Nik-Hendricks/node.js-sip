@@ -2,141 +2,20 @@ const Parser = require('./Parser');
 const Builder = require('./Builder');
 const SDPParser = require('./SDPParser');
 
-
-class P{
-    constructor(headers){
-        this.headers = headers
-    }
-
-    parse(){
-        // NOTE if you specify a key within the header object, the function will automatically return just the value of that key if it exists.
-        //an example is the CSeq header, which has a count and a method. If you specify the key as CSeq, the function will return an object with the count and method as keys.
-        var checks = {
-            "From": {contact: this.Contact, tag: this.Tag},
-            "To": {contact: this.Contact},
-            "Contact": {contact: this.Contact},
-            "Via": {uri: this.URI, branch: this.branchId},
-            "CSeq": {count: this.Cseq, method: this.Cseq},
-        }
-        var ret = {}
-        for(var header in this.headers){
-            var h = this.headers[header];
-            if(typeof checks[header] !== "undefined"){
-                if(typeof checks[header] == "function"){
-                    ret[header] = checks[header].bind(this)(h);
-                }else{
-                    for(var check in checks[header]){
-                        var c = checks[header][check].bind(this)(h);
-                        if(c){
-                            if(typeof ret[header] == "undefined"){
-                                ret[header] = {}
-                            }
-                            if(typeof c == "object"){
-                                if(typeof c[check] !== "undefined"){
-                                    ret[header][check] = c[check];
-                                }else{
-                                    ret[header][check] = c;
-                                }
-                            }else{
-                                ret[header][check] = c;
-                            }
-                        }
-                    }
-                }
-            }
- 
-        }
-        return ret;
-    }
-
-    branchId(str){
-        if(str.indexOf("branch=") > -1){
-            var v = str.match(/branch=(.*)/)[1]
-            return (v.indexOf(";") > -1) ? v.split(";")[0] : v;
-        }else{
-            return false
-        }
-    }
-
-    Tag(str){
-        if(str.indexOf("tag=") > -1){
-            return str.match(/tag=(.*)/)[1]
-        }else{
-            return false
-        }
-    }
-
-    URI(str){
-        var regex = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+)/;
-        var match = str.match(regex);
-        if(match !== null){
-            return {ip: match[1].split(":")[0], port: match[1].split(":")[1]}
-        }else{
-            return false;
-        }
-    }
-
-    Contact(str){
-        if(str.indexOf("sip:") > -1){
-            var match = str.match(/<sip:(.*)>/)[1]
-            var username = match.split(":")[0].split("@")[0];
-            var v = this.URI(match);
-            v.username = username;
-            return v
-        }else{
-            return false
-        }
-    }
-
-    Quoted(str){
-        if(str.indexOf("\"") > -1){
-            return str.split("\"")
-        }else{
-            return false;
-        }
-    }
-
-    Cseq(str){
-        var v = this.SpaceSeparated(str)
-        if(v){
-            return { count: v[0], method: v[1] }
-        }else{
-            return false;
-        }
-    }
-
-    SpaceSeparated(str){
-        if(str.indexOf(" ") > -1){
-            return str.split(" ")
-        }else{
-            return false;
-        }
-    }
-
-    getQuotedValues(str){
-        const regex = /([^=\s]+)\s*=\s*(?:"([^"]*)"|([^,;]*))/g;
-        let match;
-        while ((match = regex.exec(str))) {
-          const key = match[1];
-          const value = match[2] || match[3];
-          console.log(`Key: ${key}, Value: ${value}`);
-        }
-    }
-
-}
-
 class SIPMessage{
     constructor(context, obj){
         this.context = context;
         this.message = (typeof obj == "string") ? Parser.parse(obj) : obj;
-        this.branchId = Parser.getBranch(this.message);
-        this.callId = Parser.getCallId(this.message);
         this.cseq = Parser.getCseq(this.message);
         this.challenge = this.ExtractChallenge();
-    
-        var p = new P(this.message.headers);
-        console.log(p.parse());
-
+        this.headers = Parser.ParseHeaders(this.message.headers);
+        if(typeof this.headers !== "undefined"){
+            this.branchId = (typeof this.headers.Via !== "undefined") ? this.headers.Via.branch : Builder.generateBranch();
+            this.tag = (typeof this.headers.From !== "undefined") ? this.headers.From.tag : Builder.generateBranch();
+        }else{
+            this.branchId = Builder.generateBranch();
+            this.tag = Builder.generateBranch();
+        }
         return this;
     }
 
@@ -147,6 +26,7 @@ class SIPMessage{
             200: 'OK',
             302: 'Moved Temporarily',
             401: 'Unauthorized',
+            404: 'Not Found',
             407: 'Proxy Authentication Required',
             408: 'Request Timeout',
             480: 'Temporarily Unavailable',
@@ -170,9 +50,6 @@ class SIPMessage{
         return (typeof this.message.headers['WWW-Authenticate'] !== "undefined") ? Parser.extractHeaderParams(this.message.headers['WWW-Authenticate']) : null;
     }
 
-    GetCallId(){
-        return Parser.getCallId(this.message);
-    }
 
     ParseSDP(){
         return SDPParser.parse(this.message.body);
@@ -200,9 +77,9 @@ class SIPMessage{
     GetAuthCredentials(){
         if(typeof this.message.headers.Authorization !== "undefined"){
             return {
-                username: this.message.headers.From.match(/<sip:(.*)@/)[1],
-                password: this.message.headers.Authorization.match(/response="(.*)"/)[1],
-                nonce: this.message.headers.Authorization.match(/nonce="(.*)"/)[1],
+                username: this.headers.Authorization.username,
+                password: this.headers.Authorization.response,
+                nonce: this.headers.Authorization.nonce,
             }
         }else{
             return {error: "No Authorization header found"};
@@ -212,11 +89,9 @@ class SIPMessage{
     Authorize(challenge_response){
         var message = (typeof this.message == "string") ? Parser.parse(this.message) : this.message;
         challenge_response = (typeof challenge_response == "string") ? Parser.parse(challenge_response) : challenge_response;
-        var extractHeaderParams = challenge_response.ExtractChallenge();
-        var nonce = extractHeaderParams.nonce;
-        var realm = extractHeaderParams.realm;
+        var nonce = challenge_response.headers['WWW-Authenticate'].nonce;
+        var realm = challenge_response.headers['WWW-Authenticate'].realm;
         var response = Builder.DigestResponse(this.context.username, this.context.password, realm, nonce, message.method, `${message.requestUri}`);
-        
         message.headers.CSeq = `${Parser.getCseq(message) + 1} ${message.method}`;
         message.headers['Authorization'] = `Digest username="${this.context.username}", realm="${realm}", nonce="${nonce}", uri="${message.requestUri}", response="${response}", algorithm=MD5`;
         return message //build message from object.
