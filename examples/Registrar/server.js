@@ -29,7 +29,6 @@ class User{
 class Server{
     constructor(){
         this.SIP = new SIP({type: "server"});
-        this.FixNat = new FixNat();
         this.SIP.Socket.bind(PORT, IP)
         this.SIP.Listen()
         this.users = [];
@@ -37,7 +36,7 @@ class Server{
 
 
     Start(){
-        this.FixNat.AddRoute('172.0.3.75', '72.172.213.173')
+        this.SIP.AddNATRoute('172.0.3.75', '72.172.213.173')
 
 
         this.SIP.on('REGISTER', (res) => {
@@ -45,6 +44,9 @@ class Server{
             res.message.headers['CSeq'] = `${Parser.getCseq(res.message) + 1} REGISTER`;
             res.message.headers.Via = `SIP/2.0/UDP ${IP}:${PORT};branch=${res.branchId}`
             res.message.headers.From = `<sip:NRegistrar@${IP}:${PORT}>;tag=${res.tag}`
+
+            console.log(res.headers)
+
             if(res.GetAuthCredentials().error){
                 res.message.headers['WWW-Authenticate'] = "Digest realm=\"NRegistrar\", nonce=\"1234abcd\" algorithm=\"MD5\"";
                 var d = this.SIP.dialog_stack[res.tag]
@@ -52,7 +54,9 @@ class Server{
                     console.log("REGISTER LEVEL 2")
                     var username = res.headers.Contact.contact.username
                     if(!res.GetAuthCredentials().error){
+                        console.log(username)
                         if(this.users.hasOwnProperty(username)){
+                            console.log('USER DOES EXIST')
                             this.users[username].ip = res.headers.Contact.contact.ip
                             this.users[username].port = res.headers.Contact.contact.port;
                             console.log(this.GetMemberRoutes(res).contact.ip)
@@ -61,7 +65,7 @@ class Server{
                     }
                 })
 
-                this.SIP.send(res.CreateResponse(401), {port: res.headers.Contact.contact.port, ip: this.FixNat.GetRoute(res.headers.Contact.contact.ip)})
+                this.SIP.send(res.CreateResponse(401), {port: res.headers.Contact.contact.port, ip: res.headers.Contact.contact.ip})
             }
         })
         
@@ -150,7 +154,9 @@ class Server{
         }
 
         if(ret !== false){
-            ret.ip = this.FixNat.GetRoute(ret.ip)
+            if(typeof ret.ip !== 'undefined'){
+                ret.ip = ret.ip
+            }
         }
 
         return ret;
@@ -177,5 +183,5 @@ var SIPServer = new Server();
 SIPServer.Start();
 SIPServer.AddUser({username: "Rob", password: "1234", extension: "200"})
 SIPServer.AddUser({username: "Tim", password: "1234", extension: "201"})
-
-
+SIPServer.AddUser({username: "Joe", password: "1234", extension: "69"})
+SIPServer.AddUser({username: "Nik", password: "1234", extension: "420"})

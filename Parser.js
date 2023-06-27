@@ -120,14 +120,17 @@ const HeaderParser = {
     return HeaderParser.FindKey(str, "transport");
   },
 
-  URI:(str) => {
-      var regex = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+)/;
-      var match = str.match(regex);
-      if(match !== null){
-          return {ip: match[1].split(":")[0], port: match[1].split(":")[1]}
-      }else{
-          return false;
-      }
+  URI: (str) => {
+    var regex = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::(\d+))?/;
+    var match = str.match(regex);
+    if (match !== null) {
+        return {
+            ip: match[1],
+            port: match[2] ? match[2] : null
+        };
+    } else {
+        return false;
+    }
   },
 
   Contact:(str) => {

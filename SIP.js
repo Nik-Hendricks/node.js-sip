@@ -39,6 +39,7 @@ class SIP{
         this.transactions = []
         this.message_stack = [];
         this.dialog_stack = [];
+        this.NAT_TABLE = {}
         return this;
     }
 
@@ -51,14 +52,30 @@ class SIP{
         return new Promise((resolve) => {
             console.log("_______Constructed Message_______")
             console.log(constructed_message)
-            this.Socket.send(constructed_message, 0, constructed_message.length, Number(identity.port), identity.ip, (error) => {
-                if (!error) {
-                    this.push_to_stack(message);
-                }else{
-                    console.log(error)
-                }
-            });
+            if(typeof identity.port !== 'undefined' && typeof identity.ip !== 'undefined'){
+                this.Socket.send(constructed_message, 0, constructed_message.length, Number(identity.port), identity.ip, (error) => {
+                    if (!error) {
+                        this.push_to_stack(message);
+                    }else{
+                        console.log(error)
+                    }
+                });
+            }else{
+                console.log("ERROR NO ENDPOINT")
+            }
         });
+    }
+
+    AddNATRoute(old_route, new_route){
+        this.NAT_TABLE[old_route] = new_route;
+    }
+
+    FixNAT(sip_message){
+        var s = Builder.Build(sip_message.message);
+        for(var old in this.NAT_TABLE){
+            s = s.replace(new RegExp(old, 'g'), this.NAT_TABLE[old]);
+        }
+        return this.Message(Parser.parse(s))
     }
 
     push_to_stack(message){
@@ -87,8 +104,8 @@ class SIP{
             res_message = res_message.toString();
             if(res_message.length > 4){
                 console.log("_______Received Message_______")
-                console.log(res_message)
-                var sipMessage = this.Message(res_message);
+                var sipMessage = this.FixNAT(this.Message(res_message));
+                console.log(Builder.Build(sipMessage.message))
                 var message_ev = sipMessage.message.isResponse ? String(sipMessage.message.statusCode) : sipMessage.message.method;
                 this.push_to_stack(sipMessage);
                 if (Object.keys(this.dialog_stack).includes(sipMessage.tag)) {
