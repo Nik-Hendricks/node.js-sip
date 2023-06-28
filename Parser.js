@@ -179,7 +179,6 @@ const HeaderParser = {
       while ((match = regex.exec(str))) {
         const key = match[1];
         const value = match[2] || match[3];
-        console.log(`Key: ${key}, Value: ${value}`);
       }
   },
 
