@@ -195,7 +195,6 @@ const Parser = {
           // Parse SIP response
           const [protocol, statusCode] = firstLine.split(' ');
           const statusText = firstLine.substr(protocol.length + statusCode.length + 2);
-      
           const headers = {};
           let index = 0;
       

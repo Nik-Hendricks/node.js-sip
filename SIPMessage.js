@@ -40,7 +40,8 @@ class SIPMessage{
         
         var r = Object.assign({}, this.message);
         r.isResponse = true;
-        r.method = type;
+        r.statusCode = type
+        delete r.method
         r.requestUri = `${type} ${responses[Number(type)]}`;
 
         return r

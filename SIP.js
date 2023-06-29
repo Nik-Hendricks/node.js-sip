@@ -49,33 +49,6 @@ class SIP{
         return this;
     }
 
-    send(message, identity) {
-        identity = (typeof identity !== 'undefined') ? identity : {ip: this.ip, port: this.port};
-        message = typeof message.message !== 'undefined' ? message : this.Message(message);
-        var constructed_message = typeof message === 'object' ? Builder.Build(message.message) : message;
-        //console.log('________Sending To__________')
-        //console.log(identity)
-        return new Promise((resolve) => {
-            //console.log("_______Constructed Message_______")
-            //console.log(constructed_message)
-            if(typeof identity.port !== 'undefined' && typeof identity.ip !== 'undefined'){
-                this.Socket.send(constructed_message, 0, constructed_message.length, Number(identity.port), identity.ip, (error) => {
-                    if (!error) {
-                        this.push_to_stack(message);
-                    }else{
-                        //console.log(error)
-                    }
-                });
-            }else{
-                //console.log("ERROR NO ENDPOINT")
-            }
-        });
-    }
-
-    LOG(message){
-        this.log_buffer[new Date.now()]
-    }
-
     AddNATRoute(old_route, new_route){
         this.NAT_TABLE[old_route] = new_route;
     }
@@ -101,7 +74,7 @@ class SIP{
     }
       
     DialogExists(tag){
-        return Object.keys(this.dialogs).includes(tag);
+        return Object.keys(this.dialog_stack).includes(tag);
     }
 
     on(event, callback){
@@ -114,26 +87,28 @@ class SIP{
         });
     }
 
+    ONSENDMESSAGE(callback){
+        this.emitter.on('SENDMESSAGE', (ev) => {
+            callback(ev.toString());
+        })
+    }
+
     Listen() {
-        var ret;
         this.Socket.on('message', (res_message) => {
-            this.emitter.emit('MESSAGE', res_message);
+            var ret;
             res_message = res_message.toString();
             if(res_message.length > 4){
-                //console.log("_______Received Message_______")
                 var sipMessage = this.FixNAT(this.Message(res_message));
                 var message_ev = sipMessage.message.isResponse ? String(sipMessage.message.statusCode) : sipMessage.message.method;
                 this.push_to_stack(sipMessage);
-                if (Object.keys(this.dialog_stack).includes(sipMessage.tag)) {
-                    if (sipMessage.isResponse) {
-                        ret = sipMessage
-                    } else {
-                        var d = this.dialog_stack[sipMessage.tag];
-                        if (Object.keys(d.events).includes(message_ev)) {
-                            d.events[message_ev](sipMessage);
-                        }
-                        ret = d;
+                //this.emitter.emit('MESSAGE', Builder.Build(sipMessage.message));
+                this.emitter.emit('MESSAGE', res_message)
+                if (this.DialogExists(sipMessage.tag)) {
+                    var d = this.dialog_stack[sipMessage.tag];
+                    if (Object.keys(d.events).includes(message_ev)) {
+                        d.events[message_ev](sipMessage);
                     }
+                    ret = d;
                 }else{
                     //if there is not dialog for this message create one with the first message in the stack
                     this.Dialog(this.message_stack[sipMessage.tag][0]).then((dialog) => {
@@ -147,7 +122,23 @@ class SIP{
                 return ret;
             }
         })
-        setInterval(() => {}, 1000);
+        //setInterval(() => {}, 1000);
+    }
+
+    send(message, identity) {
+        identity = (typeof identity !== 'undefined') ? identity : {ip: this.ip, port: this.port};
+        message = typeof message.message !== 'undefined' ? message : this.Message(message);
+        var constructed_message = typeof message === 'object' ? Builder.Build(message.message) : message;
+        return new Promise((resolve) => {
+            if(typeof identity.port !== 'undefined' && typeof identity.ip !== 'undefined'){
+                this.Socket.send(constructed_message, 0, constructed_message.length, Number(identity.port), identity.ip, (error) => {
+                    if (!error) {
+                        this.push_to_stack(message);
+                        this.emitter.emit("SENDMESSAGE", JSON.stringify({message: constructed_message, identity: identity}))
+                    }
+                });
+            }
+        });
     }
 
     Dialog(message){
@@ -160,10 +151,6 @@ class SIP{
 
     Message(message){
         return new SIPMessage(this, message);
-    }
-
-    Transaction(message){
-        return new Transaction(this, message);
     }
 
     Register(){

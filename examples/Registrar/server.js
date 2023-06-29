@@ -42,33 +42,37 @@ class Server{
     Start(){
         this.SIP.AddNATRoute('172.0.3.75', '72.172.213.173');
         this.SIP.ONMESSAGE((ev) => {
+            console.log("-----------Received Message-----------")
             console.log(ev)
         })
 
+        this.SIP.ONSENDMESSAGE((ev) => {
+            ev = JSON.parse(ev)
+            console.log(`-----------Sent Message to ${ev.identity.ip}:${ev.identity.port}-----------`)
+            console.log(ev.message)
+        })
+
         this.SIP.on('REGISTER', (res) => {
-
-            //console.log("REGISTER")
-            res.message.headers['CSeq'] = `${Parser.getCseq(res.message) + 1} REGISTER`;
-            res.message.headers.Via = `SIP/2.0/UDP ${IP}:${PORT};branch=${res.branchId}`
-            res.message.headers.From = `<sip:NRegistrar@${IP}:${PORT}>;tag=${res.tag}`
-
-            //console.log(res.headers)
-
             if(res.GetAuthCredentials().error){
-                res.message.headers['WWW-Authenticate'] = "Digest realm=\"NRegistrar\", nonce=\"1234abcd\" algorithm=\"MD5\"";
+                res.message.headers['CSeq'] = `${Parser.getCseq(res.message) + 1} REGISTER`;
+                //res.message.headers.Via = `SIP/2.0/UDP ${IP}:${PORT};branch=${res.branchId}`
+                //res.message.headers.From = `<sip:NRegistrar@${IP}:${PORT}>;tag=${res.tag}`
+                res.message.headers['WWW-Authenticate'] = "Digest realm=\"NRegistrar\", nonce=\"1234abcd\", algorithm=\"MD5\"";
                 var d = this.SIP.dialog_stack[res.tag]
                 d.on('REGISTER', (res) => {
-                    //console.log("REGISTER LEVEL 2")
-
                     var username = res.headers.Contact.contact.username
-                    if(!res.GetAuthCredentials().error){
-                        if(this.users.hasOwnProperty(username)){
-                            //console.log('USER DOES EXIST')
+                    if(!res.GetAuthCredentials().error && this.users.hasOwnProperty(username)){
+         
                             this.users[username].ip = res.headers.Contact.contact.ip
                             this.users[username].port = res.headers.Contact.contact.port;
-                            //console.log(this.GetMemberRoutes(res).contact.ip)
                             this.SIP.send(res.CreateResponse(200),this.GetMemberRoutes(res).contact)
-                        }
+                        
+                    }else{
+                        res.message.headers['CSeq'] = `${Parser.getCseq(res.message) + 1} REGISTER`;
+                        res.message.headers.Via = `SIP/2.0/UDP ${IP}:${PORT};branch=${res.branchId}`
+                        res.message.headers.From = `<sip:NRegistrar@${IP}:${PORT}>;tag=${res.tag}`
+                        res.message.headers['WWW-Authenticate'] = "Digest realm=\"NRegistrar\", nonce=\"1234abcd\", algorithm=\"MD5\"";
+                        this.SIP.send(res.CreateResponse(401), {port: res.headers.Contact.contact.port, ip: res.headers.Contact.contact.ip})
                     }
                 })
 
@@ -77,20 +81,16 @@ class Server{
         })
         
         this.SIP.on('INVITE', (res) => {
-            //extract the extension from the request URI
-            //console.log("INVITE")
-            
             if(res.GetAuthCredentials().error){
                 var d = this.SIP.dialog_stack[res.tag]
-
+                
                 d.on('INVITE', (res) => {
-                        //console.log("INVITE LEVEL 2")
                         var r = this.GetMemberRoutes(res).to
                         var s = this.GetMemberRoutes(res).from
-                        //console.log(r)
+                        console.log(res.headers)
                         if(typeof r.ip !== "undefined" && typeof r.port !== "undefined"){
-                            res.message.headers['To'] = `<sip:${r.username}@${r.ip}:${r.port}>`
-                            res.message.headers['Via'] = `SIP/2.0/UDP ${IP}:${PORT};branch=${res.branchId}`
+                            //res.message.headers['To'] = `<sip:${r.username}@${r.ip}:${r.port}>`
+                            //res.message.headers['Via'] = `SIP/2.0/UDP ${IP}:${PORT};branch=${res.branchId}`
                             this.SIP.send(res.message, r)
                         }else{
                             //console.log('user not found')
@@ -101,14 +101,14 @@ class Server{
                 d.on('100', (res) => {
                     //console.log("100 LEVEL 2")
                     var r = this.GetMemberRoutes(res).from
-                    res.message.headers['To'] = `<sip:${r.username}@${r.ip}:${r.port}>`
+                    //res.message.headers['To'] = `<sip:${r.username}@${r.ip}:${r.port}>`
                     this.SIP.send(res.CreateResponse(100), r)
                 })
     
                 d.on('180', (res) => {
-                    //console.log("180 LEVEL 2")
+                    console.log("180 LEVEL 2")
                     var r = this.GetMemberRoutes(res).from
-                    res.message.headers['To'] = `<sip:${r.username}@${r.ip}:${r.port}>`
+                    //res.message.headers['To'] = `<sip:${r.username}@${r.ip}:${r.port}>`
                     this.SIP.send(res.CreateResponse(180), r)
                 })
                 
@@ -119,7 +119,6 @@ class Server{
                     this.SIP.send(res.CreateResponse(200), r)
                 })
                 
-
                 d.on('486', (res) => {
                     this.SIP.send(res.CreateResponse(200), this.GetMemberRoutes(res).from)
                 })
@@ -160,7 +159,7 @@ class Server{
             ret = this.users[query]
         }
 
-        if(ret !== false){
+        if(ret !== false || ret !== undefined){
             if(typeof ret.ip !== 'undefined'){
                 ret.ip = ret.ip
             }
