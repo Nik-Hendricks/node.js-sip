@@ -53,7 +53,8 @@ class Server{
         })
 
         this.SIP.on('REGISTER', (res) => {
-            if(res.GetAuthCredentials().error){
+            console.log(!this.SIP.DialogExists(res.tag))
+            if(res.GetAuthCredentials().error || !this.SIP.DialogExists(res.tag)){
                 res.message.headers['CSeq'] = `${Parser.getCseq(res.message) + 1} REGISTER`;
                 //res.message.headers.Via = `SIP/2.0/UDP ${IP}:${PORT};branch=${res.branchId}`
                 //res.message.headers.From = `<sip:NRegistrar@${IP}:${PORT}>;tag=${res.tag}`
@@ -91,6 +92,8 @@ class Server{
                         if(typeof r.ip !== "undefined" && typeof r.port !== "undefined"){
                             //res.message.headers['To'] = `<sip:${r.username}@${r.ip}:${r.port}>`
                             //res.message.headers['Via'] = `SIP/2.0/UDP ${IP}:${PORT};branch=${res.branchId}`
+                            console.log(r)
+                            console.log((res.headers.Via.uri.ip == r.ip))
                             this.SIP.send(res.message, r)
                         }else{
                             //console.log('user not found')
@@ -120,7 +123,11 @@ class Server{
                 })
                 
                 d.on('486', (res) => {
-                    this.SIP.send(res.CreateResponse(200), this.GetMemberRoutes(res).from)
+                    this.SIP.send(res.CreateResponse(486), this.GetMemberRoutes(res).from)
+                })
+
+                d.on('CANCEL', (res) => {
+                    this.SIP.send(res.message, this.GetMemberRoutes(res).from)
                 })
 
                 res.message.headers['WWW-Authenticate'] = "Digest realm=\"NRegistrar\", nonce=\"1234abcd\" algorithm=\"MD5\"";
@@ -133,6 +140,7 @@ class Server{
             res.message.headers['PISS'] = 'Hack me if you can MF'
             this.SIP.send(res.CreateResponse(200), this.GetMemberRoutes(res).from)
         })
+        
 
     }
 
@@ -159,10 +167,8 @@ class Server{
             ret = this.users[query]
         }
 
-        if(ret !== false || ret !== undefined){
-            if(typeof ret.ip !== 'undefined'){
-                ret.ip = ret.ip
-            }
+        if(ret !== false || ret.ip !== undefined){
+            ret.ip = ret.ip
         }
 
         return ret;
