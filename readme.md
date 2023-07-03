@@ -37,32 +37,25 @@ const sipClient = new SIP(ip, port, username, password);
 Use the various methods and events provided by the library to interact with the SIP protocol. For example, you can send a SIP message using the send method:
 
 ```javascript
-sipClient.send(message)
-  .then(response => {
+sipClient.send(message).then(response => {
     // Handle the response
-  })
-  .catch(error => {
-    // Handle the error
-  });
+})
 ```
 
 Register your SIP client with the SIP server using the Register method:
 ```javascript
-sipClient.Register()
-  .then(dialog => {
+sipClient.Register().then(dialog => {
     // Handle the registration success
-  })
-  .catch(error => {
-    // Handle the registration failure
-  });
+})
+
 ```
 
-Handle SIP events using the on method. For example, you can listen for a 401 Unauthorized response:
+Handle SIP events using the on method. For example, you can listen for a 401 Unauthorized resposse:
 
 ```javascript
 sipClient.on('401', response => {
   // Handle the 401 response
-});
+});s
 ```
 
 ## Examples
@@ -74,29 +67,22 @@ The following examples demonstrate how to use the SIP library:
 ```javascript
 const message = "SIP MESSAGE ";
 
-sipClient.send(message)
-  .then(response => {
+sipClient.send(message).then(response => {
     // Handle the response
-  })
-  .catch(error => {
-    // Handle the error
-  });
+})
 ```
 **Registering a SIP Client:**
 
 ```javascript
-sipClient.Register()
-  .then(dialog => {
+sipClient.Register().then(dialog => {
     // Handle the registration success
-  })
-  .catch(error => {
-    // Handle the registration failure
-  });
-
+})
 ```
 
 ## Contributing
 Contributions are welcome! If you have any bug reports, feature requests, or suggestions, please open an issue on the GitHub repository.
 
 ## License
+Copyright Nicholas Cooley 2023
+
 This library is licensed under the MIT License.
