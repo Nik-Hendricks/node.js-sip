@@ -50,7 +50,7 @@ Client.on('INVITE', (res) => {
         var ip = SDPParser.parse(res.message.body).session.origin.split(' ')[5]
         var s = new STREAMER('output.wav', ip, port, 'ulaw')
 
-        //monitor()
+        monitor(port)
 
         s.start().then(sdp => {
             var ok = res.CreateResponse(200)
@@ -68,19 +68,17 @@ Client.on('INVITE', (res) => {
 
 
 
-function monitor(){
-    //var s2 = new STREAMER('output.wav', '192.168.1.3', 12342, 'ulaw')
-
-    var test_sdp = `v=0
+function monitor(port){
+    var test_sdp = `
+v=0
 o=- 0 0 IN IP4 192.168.1.3
 s=Stream from Node.js
 c=IN IP4 192.168.1.3
 t=0 0
 a=tool:libavformat 58.29.100
-m=audio 12420 RTP/AVP 0
+m=audio ${port} RTP/AVP 0
 b=AS:64`
 
-    //s2.start()
     var l = new RTPListen(test_sdp)
     l.start()
 

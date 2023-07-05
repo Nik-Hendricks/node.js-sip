@@ -1,4 +1,5 @@
 const spawn = require('child_process').spawn;
+const fs = require('fs');
 
 class Converter{
     constructor(){
@@ -20,16 +21,29 @@ class Converter{
                 outputFilePath
             ];
 
-            const ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
-            ffmpegProcess.stderr.on('data', (data) => {
-                ffmpegProcess.stdin.write('y');
-                ffmpegProcess.stdin.end();
-            })
+            this.audioExists(inputFilePath).then(exists => {
+                if(exists){
+                    fs.unlinkSync(inputFilePath)
+                }
+                const ffmpegProcess = spawn('ffmpeg', ffmpegArgs , {shell: true});
 
-            ffmpegProcess.on('close', (code) => {
-                resolve(true)
+
+                ffmpegProcess.on('close', (code) => {
+                    resolve(true)
+                })
             })
+        })
+    }
+    audioExists(file){
+        return new Promise((resolve) => {
+            fs.access(file, fs.constants.F_OK, (err) => {
+                if (err) {
+                  resolve(false)
+                } else {
+                  resolve(true)
+                }
+            });
         })
     }
 }
