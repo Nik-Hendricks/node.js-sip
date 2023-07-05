@@ -33,7 +33,7 @@ Client.Listen();
 Client.Register().then(dialog => {
     console.log("REGISTERED")
     //call('200')
-    new Converter().convert('audio.mp3', 'output.wav','ulaw').then(() => {
+    new Converter().convert('test2.mp3', 'output.wav','ulaw').then(() => {
         console.log('Conversion complete')
     })
 })
@@ -43,13 +43,14 @@ Client.on('INVITE', (res) => {
     console.log("Received INVITE")
     var d = Client.Dialog(res).then(dialog => {
 
+        dialog.send(res.CreateResponse(100))
+        dialog.send(res.CreateResponse(180))
+
         var port = SDPParser.parse(res.message.body).media[0].port
         var ip = SDPParser.parse(res.message.body).session.origin.split(' ')[5]
         var s = new STREAMER('output.wav', ip, port, 'ulaw')
 
-        dialog.send(res.CreateResponse(100))
-        dialog.send(res.CreateResponse(180))
-        monitor()
+        //monitor()
 
         s.start().then(sdp => {
             var ok = res.CreateResponse(200)
