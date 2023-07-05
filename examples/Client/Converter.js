@@ -22,13 +22,16 @@ class Converter{
             ];
 
 
-            this.audioExists(inputFilePath).then(exists => {
+            this.audioExists(outputFilePath).then(exists => {
                 if(exists){
-                    fs.unlinkSync(inputFilePath)
+                    fs.unlinkSync(outputFilePath)
                 }
                 const ffmpegProcess = spawn('ffmpeg', ffmpegArgs , {shell: true});
 
-
+                ffmpegProcess.stderr.on('data', (data) => {
+                    console.log(data.toString())
+                })
+                
                 ffmpegProcess.on('close', (code) => {
                     resolve(true)
                 })

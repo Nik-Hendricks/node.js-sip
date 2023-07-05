@@ -33,7 +33,7 @@ Client.Listen();
 Client.Register().then(dialog => {
     console.log("REGISTERED")
     //call('200')
-    new Converter().convert('test2.mp3', 'output.wav','ulaw').then(() => {
+    new Converter().convert('test.mp3', 'output.wav','ulaw').then(() => {
         console.log('Conversion complete')
     })
 })
