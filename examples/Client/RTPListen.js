@@ -12,11 +12,11 @@ class RTPListen{
         const ffmpegArgs = [
             '-protocol_whitelist', 'pipe,file,rtp,udp', // Read input at the native frame rate
             '-i','pipe:0' 
-          ];
+        ];
 
         const ffmpegProcess = spawn('ffplay', ffmpegArgs);
-       ffmpegProcess.stdin.write(this.sdp);
-       ffmpegProcess.stdin.end();
+        ffmpegProcess.stdin.write(this.sdp);
+        ffmpegProcess.stdin.end();
     }
 }
 

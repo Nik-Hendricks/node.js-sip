@@ -5,6 +5,7 @@ const Parser = require("../../Parser.js");
 const Builder = require("../../Builder.js");
 const STREAMER = require("./Stream.js")
 const RTPListen = require("./RTPListen.js")
+const Converter = require("./Converter.js")
 require('dotenv').config({ path: 'CONFIG.env' });
 
 const asteriskDOMAIN = process.env.ASTERISK_DOMAIN;
@@ -31,34 +32,26 @@ Client.Listen();
 
 Client.Register().then(dialog => {
     console.log("REGISTERED")
-    //call('201')
+    //call('200')
+    new Converter().convert('audio.mp3', 'output.wav','ulaw').then(() => {
+        console.log('Conversion complete')
+    })
 })
 
 //receive a call
 Client.on('INVITE', (res) => {
     console.log("Received INVITE")
     var d = Client.Dialog(res).then(dialog => {
+
+        var port = SDPParser.parse(res.message.body).media[0].port
+        var ip = SDPParser.parse(res.message.body).session.origin.split(' ')[5]
+        var s = new STREAMER('output.wav', ip, port, 'ulaw')
+
         dialog.send(res.CreateResponse(100))
         dialog.send(res.CreateResponse(180))
-        var port = SDPParser.parse(res.message.body).media[0].port
-        var s = new STREAMER('output.wav', '192.168.1.39', 12121)
-//        var s2 = new STREAMER('output.wav', '192.168.1.3', 14234)
-//        s2.start().then(sdp => {
-//            var test_sdp = `v=0
-//o=- 0 0 IN IP4 192.168.1.3
-//s=Impact Moderato
-//c=IN IP4 192.168.1.3
-//t=0 0
-//a=tool:libavformat 58.29.100
-//m=audio 14234 RTP/AVP 97
-//b=AS:128
-//a=rtpmap:97 PCMU/8000/2`
-//            var l = new RTPListen(test_sdp)
-//            l.start()
-//        })
+        monitor()
 
         s.start().then(sdp => {
-            console.log(sdp)
             var ok = res.CreateResponse(200)
             ok.body = sdp
             dialog.send(ok)
@@ -73,6 +66,24 @@ Client.on('INVITE', (res) => {
 })
 
 
+
+function monitor(){
+    //var s2 = new STREAMER('output.wav', '192.168.1.3', 12342, 'ulaw')
+
+    var test_sdp = `v=0
+o=- 0 0 IN IP4 192.168.1.3
+s=Stream from Node.js
+c=IN IP4 192.168.1.3
+t=0 0
+a=tool:libavformat 58.29.100
+m=audio 12420 RTP/AVP 0
+b=AS:64`
+
+    //s2.start()
+    var l = new RTPListen(test_sdp)
+    l.start()
+
+}
 
 //Client.on('INVITE', (res) => {
 //    console.log("Received INVITE");
