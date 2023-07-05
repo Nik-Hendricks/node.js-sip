@@ -46,7 +46,7 @@ Client.on('INVITE', (res) => {
         //var l = new RTPListen(res.message.body)
         //l.start()
 
-        var s = new STREAMER('output.wav', '192.168.1.39', 11784)
+        var s = new STREAMER('output.wav', '192.168.1.39', port)
         s.start().then(sdp => {
             console.log(sdp)
             var ok = res.CreateResponse(200)
