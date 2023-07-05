@@ -23,10 +23,10 @@ class Streamer{
            // const ffmpegProcess = spawn(ffmpegCommand, { shell: true });
     
             ffmpegProcess.stdout.on('data', (data) => {
-                data = data.toString()
+                //data = data.toString()
                 //replace all instances of 127.0.0.1 with our local ip address
-                data = data.replace(new RegExp('127.0.0.1', 'g'), '192.168.1.3');
-                data.split('SDP:')[1]
+                //data = data.replace(new RegExp('127.0.0.1', 'g'), '192.168.1.3');
+                //data.split('SDP:')[1]
                 data = `v=0
                 o=- ${this.output_port} ${this.output_port} IN IP4 192.168.1.39
                 s=SDP data

@@ -41,24 +41,21 @@ Client.on('INVITE', (res) => {
         dialog.send(res.CreateResponse(100))
         dialog.send(res.CreateResponse(180))
         var port = SDPParser.parse(res.message.body).media[0].port
-
-        console.log(res.message.body)
-
         var s = new STREAMER('output.wav', '192.168.1.39', 12121)
-        var s2 = new STREAMER('output.wav', '192.168.1.3', 14234)
-        s2.start().then(sdp => {
-            var test_sdp = `v=0
-o=- 0 0 IN IP4 192.168.1.3
-s=Impact Moderato
-c=IN IP4 192.168.1.3
-t=0 0
-a=tool:libavformat 58.29.100
-m=audio 14234 RTP/AVP 97
-b=AS:128
-a=rtpmap:97 PCMU/8000/2`
-            var l = new RTPListen(test_sdp)
-            l.start()
-        })
+//        var s2 = new STREAMER('output.wav', '192.168.1.3', 14234)
+//        s2.start().then(sdp => {
+//            var test_sdp = `v=0
+//o=- 0 0 IN IP4 192.168.1.3
+//s=Impact Moderato
+//c=IN IP4 192.168.1.3
+//t=0 0
+//a=tool:libavformat 58.29.100
+//m=audio 14234 RTP/AVP 97
+//b=AS:128
+//a=rtpmap:97 PCMU/8000/2`
+//            var l = new RTPListen(test_sdp)
+//            l.start()
+//        })
 
         s.start().then(sdp => {
             console.log(sdp)
