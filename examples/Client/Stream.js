@@ -27,11 +27,10 @@ class Streamer{
                 //replace all instances of 127.0.0.1 with our local ip address
                 data = data.replace(new RegExp('127.0.0.1', 'g'), '192.168.1.3');
                 data.split('SDP:')[1]
-
                 data = `v=0
-                o=- ${this.output_port} ${this.output_port} IN IP4 192.168.1.3
+                o=- ${this.output_port} ${this.output_port} IN IP4 192.168.1.39
                 s=SDP data
-                c=IN IP4 192.168.1.3
+                c=IN IP4 192.168.1.39
                 t=0 0
                 m=audio ${this.output_port} RTP/AVP 0 8 18 9 101
                 a=rtpmap:0 PCMU/8000
