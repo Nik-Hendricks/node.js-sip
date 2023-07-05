@@ -135,13 +135,6 @@ class Server{
                 return;
             }
         })
-
-        this.SIP.on('OPTIONS', (res) => {
-            res.message.headers['PISS'] = 'Hack me if you can MF'
-            this.SIP.send(res.CreateResponse(200), this.GetMemberRoutes(res).from)
-        })
-        
-
     }
 
     convertToNumber(str) {

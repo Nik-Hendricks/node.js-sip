@@ -10,8 +10,6 @@ const Transaction = require("./Transaction");
 const os = require("os");
 const EventEmitter = require('events');
 
-
-
 const generateCallid = () => {
   const branchId = Math.floor(Math.random() * 10000000000000);
   return `${branchId}`;

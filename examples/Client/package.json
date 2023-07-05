@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "dotenv": "^16.3.1",
+    "ffmpeg-static": "^5.1.0",
     "mic": "^2.1.2",
     "rtp": "^0.1.0"
   }

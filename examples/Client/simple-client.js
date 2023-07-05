@@ -2,9 +2,9 @@ const SIP = require("../../SIP.js");
 const SIPMessage = require("../../SIPMessage.js");
 const SDPParser = require("../../SDPParser.js");
 const Parser = require("../../Parser.js");
-const RTP = require("../../RTP.js");
-const MediaStream = require("../../Media.js");
 const Builder = require("../../Builder.js");
+const STREAMER = require("./Stream.js")
+const RTPListen = require("./RTPListen.js")
 require('dotenv').config({ path: 'CONFIG.env' });
 
 const asteriskDOMAIN = process.env.ASTERISK_DOMAIN;
@@ -31,30 +31,38 @@ Client.Listen();
 
 Client.Register().then(dialog => {
     console.log("REGISTERED")
-    call('201')
+    //call('201')
 })
 
 //receive a call
 Client.on('INVITE', (res) => {
     console.log("Received INVITE")
     var d = Client.Dialog(res).then(dialog => {
-        console.log("RESPONSE")
         dialog.send(res.CreateResponse(100))
         dialog.send(res.CreateResponse(180))
-        dialog.send(res.CreateResponse(200))
+        var port = SDPParser.parse(res.message.body).media[0].port
 
-        console.log(res.ParseSDP())
-        
+        console.log(res.message.body)
+        //var l = new RTPListen(res.message.body)
+        //l.start()
+
+        var s = new STREAMER('output.wav', '192.168.1.39', 11784)
+        s.start().then(sdp => {
+            console.log(sdp)
+            var ok = res.CreateResponse(200)
+            ok.body = sdp
+            dialog.send(ok)
+        })
+
         dialog.on('BYE', (res) => {
             console.log("BYE")
             dialog.send(res.CreateResponse(200))
             dialog.kill()
         })
-
-        
-
     })
 })
+
+
 
 //Client.on('INVITE', (res) => {
 //    console.log("Received INVITE");
