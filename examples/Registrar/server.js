@@ -1,3 +1,4 @@
+const os = require('os');
 const SIP = require("../../SIP.js");
 const SIPMessage = require("../../SIPMessage.js");
 const SDPParser = require("../../SDPParser.js");
