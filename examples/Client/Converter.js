@@ -27,10 +27,6 @@ class Converter{
                     fs.unlinkSync(outputFilePath)
                 }
                 const ffmpegProcess = spawn('ffmpeg', ffmpegArgs , {shell: true});
-
-                ffmpegProcess.stderr.on('data', (data) => {
-                    console.log(data.toString())
-                })
                 
                 ffmpegProcess.on('close', (code) => {
                     resolve(true)

@@ -122,6 +122,10 @@ class Server{
                     this.SIP.send(res.CreateResponse(200), r)
                 })
                 
+                d.on('302', (res) => {
+                    console.log("302 LEVEL 2")
+                })
+                
                 d.on('486', (res) => {
                     this.SIP.send(res.CreateResponse(486), this.GetMemberRoutes(res).from)
                 })

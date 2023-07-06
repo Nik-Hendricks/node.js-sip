@@ -39,32 +39,32 @@ Client.Register().then(dialog => {
 })
 
 //receive a call
-Client.on('INVITE', (res) => {
-    console.log("Received INVITE")
-    var d = Client.Dialog(res).then(dialog => {
-
-        dialog.send(res.CreateResponse(100))
-        dialog.send(res.CreateResponse(180))
-
-        var port = SDPParser.parse(res.message.body).media[0].port
-        var ip = SDPParser.parse(res.message.body).session.origin.split(' ')[5]
-        var s = new STREAMER('output.wav', ip, port, 'ulaw')
-
-        monitor(port)
-
-        s.start().then(sdp => {
-            var ok = res.CreateResponse(200)
-            ok.body = sdp
-            dialog.send(ok)
-        })
-
-        dialog.on('BYE', (res) => {
-            console.log("BYE")
-            dialog.send(res.CreateResponse(200))
-            dialog.kill()
-        })
-    })
-})
+//Client.on('INVITE', (res) => {
+//    console.log("Received INVITE")
+//    var d = Client.Dialog(res).then(dialog => {
+//
+//        dialog.send(res.CreateResponse(100))
+//        dialog.send(res.CreateResponse(180))
+//
+//        var port = SDPParser.parse(res.message.body).media[0].port
+//        var ip = SDPParser.parse(res.message.body).session.origin.split(' ')[5]
+//        var s = new STREAMER('output.wav', ip, port, 'ulaw')
+//
+//        //monitor(port)
+//
+//        s.start().then(sdp => {
+//            var ok = res.CreateResponse(200)
+//            ok.body = sdp
+//            dialog.send(ok)
+//        })
+//
+//        dialog.on('BYE', (res) => {
+//            console.log("BYE")
+//            dialog.send(res.CreateResponse(200))
+//            dialog.kill()
+//        })
+//    })
+//})
 
 
 
@@ -84,29 +84,29 @@ b=AS:64`
 
 }
 
-//Client.on('INVITE', (res) => {
-//    console.log("Received INVITE");
-//
-//    // Determine the new target location (extension) for redirection
-//    var newExtension = `420@${asteriskIP}`;
-//    
-//    // Create a SIP 302 Moved Temporarily response
-//    var redirectResponse = res.CreateResponse(302);
-//    redirectResponse.headers.Contact = `<sip:${newExtension}>`;
-//
-//    // Send the redirect response
-//    var d = Client.Dialog(res).then(dialog => {
-//        dialog.send(redirectResponse);
-//        // Optionally, you can send additional provisional responses (e.g., 180 Ringing) if desired
-//        dialog.send(res.CreateResponse(180));
-//   
-//        dialog.on('BYE', (res) => {
-//            console.log("BYE");
-//            dialog.send(res.CreateResponse(200));
-//            dialog.kill();
-//        });
-//    });
-//});
+Client.on('INVITE', (res) => {
+    console.log("Received INVITE");
+
+    // Determine the new target location (extension) for redirection
+    var newExtension = `202@${asteriskIP}`;
+    
+    // Create a SIP 302 Moved Temporarily response
+    var redirectResponse = res.CreateResponse(302);
+    redirectResponse.headers.Contact = `<sip:${newExtension}>`;
+
+    // Send the redirect response
+    var d = Client.Dialog(res).then(dialog => {
+        dialog.send(redirectResponse);
+        // Optionally, you can send additional provisional responses (e.g., 180 Ringing) if desired
+        dialog.send(res.CreateResponse(180));
+   
+        dialog.on('BYE', (res) => {
+            console.log("BYE");
+            dialog.send(res.CreateResponse(200));
+            dialog.kill();
+        });
+    });
+});
 
 
 //function to make a call
@@ -158,11 +158,3 @@ var call = (extension) => {
         })
     })
 }
-
-//setInterval(() => {
-//    console.log("____ CLIENT DIALOGS ____\n\n")
-//    console.log(Client.dialog_stack)
-//    console.log("\n\n")
-//    console.log("____ CLIENT TRANSACTIONS ____\n\n")
-//    console.log(Client.transactions)
-//}, 5000);
