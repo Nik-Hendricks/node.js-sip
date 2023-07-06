@@ -43,9 +43,9 @@ class Server{
         const interfaces = os.networkInterfaces();
         
         for (const interfaceName in interfaces) {
-          const interface = interfaces[interfaceName];
+          const _interface = interfaces[interfaceName];
           
-          for (const interfaceInfo of interface) {
+          for (const interfaceInfo of _interface) {
             if (interfaceInfo.family === 'IPv4' && !interfaceInfo.internal) {
               return interfaceInfo.address;
             }
