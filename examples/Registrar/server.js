@@ -32,12 +32,28 @@ class User{
 class Server{
     constructor(){
         this.SIP = new SIP({type: "server"});
+        console.log(this.getLocalIpAddress())
         this.SIP.Socket.bind(PORT, IP)
         this.SIP.Listen()
         this.users = [];
 
     }
 
+    getLocalIpAddress() {
+        const interfaces = os.networkInterfaces();
+        
+        for (const interfaceName in interfaces) {
+          const interface = interfaces[interfaceName];
+          
+          for (const interfaceInfo of interface) {
+            if (interfaceInfo.family === 'IPv4' && !interfaceInfo.internal) {
+              return interfaceInfo.address;
+            }
+          }
+        }
+        
+        return null; // Return null if no IP address is found
+    }
 
     Start(){
         this.SIP.AddNATRoute('172.0.3.75', '72.172.213.173');
