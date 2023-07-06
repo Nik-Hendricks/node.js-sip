@@ -6,7 +6,7 @@ class Converter{
 
     }
 
-    convert(inputFilePath, outputFilePath, outputFormat = 'ulaw'){
+    convert(inputFilePath, outputFilePath, outputFormat){
         return new Promise((resolve) => {
             var format_map = {
                 'ulaw': 'pcm_mulaw',
@@ -20,6 +20,7 @@ class Converter{
                 '-acodec', format_map[outputFormat],
                 outputFilePath
             ];
+
 
 
             this.audioExists(outputFilePath).then(exists => {
