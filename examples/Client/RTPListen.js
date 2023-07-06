@@ -17,11 +17,10 @@ class RTPListen{
         const ffmpegProcess = spawn('ffplay', ffmpegArgs);
         ffmpegProcess.stdin.write(this.sdp);
         ffmpegProcess.stdin.end();
+    }
 
-        ffmpegProcess.stderr.on('data', (data) => {
-            console.log(data.toString())
-        })
-
+    stop(){
+        
     }
 }
 

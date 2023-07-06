@@ -7,15 +7,14 @@ const STREAMER = require("./Stream.js")
 const RTPListen = require("./RTPListen.js")
 const Converter = require("./Converter.js")
 const UTILS = require("../../UTILS.js")
-require('dotenv').config({ path: 'CONFIG.env' });
 
-const asteriskDOMAIN = process.env.ASTERISK_DOMAIN;
-const asteriskIP = process.env.ASTERISK_IP;
-const asteriskPort = process.env.ASTERISK_PORT;
+const asteriskDOMAIN = '192.168.2.63';
+const asteriskIP = '192.168.2.63';
+const asteriskPort = 5060;
 const clientIP = UTILS.getLocalIpAddress();
 const clientPort = 6420
-const username = process.env.LOGIN_USERNAME;
-const password = process.env.LOGIN_PASSWORD;
+const username = 'Tim'
+const password = '1234';
 let callId;
 var Client = new SIP({ip: asteriskIP, port: asteriskPort, username: username, password: password, client_ip: clientIP, client_port: clientPort})
 
@@ -27,6 +26,7 @@ Client.Socket.bind(clientPort, clientIP)
 
 
 
+var call_listeners = []
 
 
 Client.Listen();
@@ -51,12 +51,13 @@ Client.on('INVITE', (res) => {
         var ip = SDPParser.parse(res.message.body).session.origin.split(' ')[5]
         var s = new STREAMER('output_song.wav', ip, port, 'ulaw')
 
-        monitor(212142)
+        
 
         s.start(res.message.headers['User-Agent']).then(sdp => {
             var ok = res.CreateResponse(200)
             ok.body = sdp
             dialog.send(ok)
+            new_listener('test', 21214);
         })
 
         dialog.on('BYE', (res) => {
@@ -73,9 +74,7 @@ Client.on('INVITE', (res) => {
     })
 })
 
-
-
-function monitor(port){
+function new_listener(id, port){
     var test_sdp = `
 v=0
 o=- 0 0 IN IP4 ${UTILS.getLocalIpAddress()}
@@ -85,11 +84,10 @@ t=0 0
 a=tool:libavformat 58.29.100
 m=audio ${port} RTP/AVP 0
 b=AS:64`
-
-    var l = new RTPListen(test_sdp)
-    l.start()
-
+    call_listeners[id] = new RTPListen(test_sdp)
+    call_listeners[id].start()
 }
+
 
 //Client.on('INVITE', (res) => {
 //    console.log("Received INVITE");

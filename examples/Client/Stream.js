@@ -7,7 +7,7 @@ class Streamer{
         this.inputFilePath = inputFilePath;
         this.rtpAddress = rtpAddress;
         this.output_port = output_port;
-        this.input_port = 212142;
+        this.input_port = 21214;
         this.outputFormat = outputFormat;
     }
 
