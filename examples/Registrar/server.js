@@ -11,10 +11,6 @@ const TUI = require('./TUI.js')
 //const Logger = 
 
 
-var IP = '64.227.16.15'
-var PORT = 5060
-
-
 
 
 
@@ -32,9 +28,10 @@ class User{
 
 class Server{
     constructor(){
+        this.IP = this.getLocalIpAddress();
+        this.PORT = 5060;
         this.SIP = new SIP({type: "server"});
-        console.log(this.getLocalIpAddress())
-        this.SIP.Socket.bind(PORT, IP)
+        this.SIP.Socket.bind(this.PORT, this.IP)
         this.SIP.Listen()
         this.users = [];
 
@@ -73,8 +70,8 @@ class Server{
             console.log(!this.SIP.DialogExists(res.tag))
             if(res.GetAuthCredentials().error || !this.SIP.DialogExists(res.tag)){
                 res.message.headers['CSeq'] = `${Parser.getCseq(res.message) + 1} REGISTER`;
-                //res.message.headers.Via = `SIP/2.0/UDP ${IP}:${PORT};branch=${res.branchId}`
-                //res.message.headers.From = `<sip:NRegistrar@${IP}:${PORT}>;tag=${res.tag}`
+                //res.message.headers.Via = `SIP/2.0/UDP ${this.IP}:${this.PORT};branch=${res.branchId}`
+                //res.message.headers.From = `<sip:NRegistrar@${this.IP}:${this.PORT}>;tag=${res.tag}`
                 res.message.headers['WWW-Authenticate'] = "Digest realm=\"NRegistrar\", nonce=\"1234abcd\", algorithm=\"MD5\"";
                 var d = this.SIP.dialog_stack[res.tag]
                 d.on('REGISTER', (res) => {
@@ -87,8 +84,8 @@ class Server{
                         
                     }else{
                         res.message.headers['CSeq'] = `${Parser.getCseq(res.message) + 1} REGISTER`;
-                        res.message.headers.Via = `SIP/2.0/UDP ${IP}:${PORT};branch=${res.branchId}`
-                        res.message.headers.From = `<sip:NRegistrar@${IP}:${PORT}>;tag=${res.tag}`
+                        res.message.headers.Via = `SIP/2.0/UDP ${this.IP}:${this.PORT};branch=${res.branchId}`
+                        res.message.headers.From = `<sip:NRegistrar@${this.IP}:${this.PORT}>;tag=${res.tag}`
                         res.message.headers['WWW-Authenticate'] = "Digest realm=\"NRegistrar\", nonce=\"1234abcd\", algorithm=\"MD5\"";
                         this.SIP.send(res.CreateResponse(401), {port: res.headers.Contact.contact.port, ip: res.headers.Contact.contact.ip})
                     }
@@ -108,7 +105,7 @@ class Server{
                         console.log(res.headers)
                         if(typeof r.ip !== "undefined" && typeof r.port !== "undefined"){
                             //res.message.headers['To'] = `<sip:${r.username}@${r.ip}:${r.port}>`
-                            //res.message.headers['Via'] = `SIP/2.0/UDP ${IP}:${PORT};branch=${res.branchId}`
+                            //res.message.headers['Via'] = `SIP/2.0/UDP ${this.IP}:${this.PORT};branch=${res.branchId}`
                             console.log(r)
                             console.log((res.headers.Via.uri.ip == r.ip))
                             this.SIP.send(res.message, r)
