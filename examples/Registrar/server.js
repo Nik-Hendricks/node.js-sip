@@ -124,6 +124,9 @@ class Server{
                 
                 d.on('302', (res) => {
                     console.log("302 LEVEL 2")
+                    var r = this.GetMemberRoutes(res).from
+                    res.message.headers['To'] = `<sip:${r.username}@${r.ip}:${r.port}>`
+                    this.SIP.send(res.CreateResponse(302), r)
                 })
                 
                 d.on('486', (res) => {
