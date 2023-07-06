@@ -8,6 +8,7 @@ const Parser = require("../../Parser.js");
 const Builder = require("../../Builder.js");
 const FixNat = require('./FixNat.js')
 const TUI = require('./TUI.js')
+const UTILS = require('../../UTILS.js')
 //const Logger = 
 
 
@@ -28,29 +29,13 @@ class User{
 
 class Server{
     constructor(){
-        this.IP = this.getLocalIpAddress();
+        this.IP = UTILS.getLocalIpAddress();
         this.PORT = 5060;
         this.SIP = new SIP({type: "server"});
         this.SIP.Socket.bind(this.PORT, this.IP)
         this.SIP.Listen()
         this.users = [];
 
-    }
-
-    getLocalIpAddress() {
-        const interfaces = os.networkInterfaces();
-        
-        for (const interfaceName in interfaces) {
-          const _interface = interfaces[interfaceName];
-          
-          for (const interfaceInfo of _interface) {
-            if (interfaceInfo.family === 'IPv4' && !interfaceInfo.internal) {
-              return interfaceInfo.address;
-            }
-          }
-        }
-        
-        return null; // Return null if no IP address is found
     }
 
     Start(){
@@ -148,7 +133,7 @@ class Server{
                 })
 
                 d.on('CANCEL', (res) => {
-                    this.SIP.send(res.message, this.GetMemberRoutes(res).from)
+                    this.SIP.send(res.message, this.GetMemberRoutes(res).to)
                 })
 
                 res.message.headers['WWW-Authenticate'] = "Digest realm=\"NRegistrar\", nonce=\"1234abcd\" algorithm=\"MD5\"";
@@ -212,3 +197,4 @@ SIPServer.AddUser({username: "Tim", password: "1234", extension: "201"})
 SIPServer.AddUser({username: "Joe", password: "1234", extension: "69"})
 SIPServer.AddUser({username: "Nik", password: "1234", extension: "420"})
 SIPServer.AddUser({username: "Billy", password: "1234", extension: "202"})
+SIPServer.AddUser({username: 'ADMIN', passwod:' 1234', extension: '1000'})

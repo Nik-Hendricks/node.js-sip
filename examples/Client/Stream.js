@@ -1,11 +1,13 @@
 const { spawn } = require('child_process');
+const UTILS = require('../../UTILS.js')
+
 
 class Streamer{
     constructor(inputFilePath, rtpAddress, output_port, outputFormat){
         this.inputFilePath = inputFilePath;
         this.rtpAddress = rtpAddress;
         this.output_port = output_port;
-        this.input_port = 12420;
+        this.input_port = 212142;
         this.outputFormat = outputFormat;
     }
 
@@ -36,11 +38,12 @@ class Streamer{
 
             ffmpegProcess.stdout.on('data', (data) => {
 
-                if(useragent.includes('Yealink')){
+                if(useragent.includes('Yealink') || useragent.includes('Tadiran')){
+                    console.log("ALT SDP")
                     data = `v=0
-                    o=- ${this.input_port} ${this.input_port} IN IP4 192.168.1.3
+                    o=- ${this.input_port} ${this.input_port} IN IP4 ${UTILS.getLocalIpAddress()}
                     s=SDP data
-                    c=IN IP4 192.168.1.3
+                    c=IN IP4 ${UTILS.getLocalIpAddress()}
                     t=0 0
                     m=audio ${this.input_port} RTP/AVP 0 101
                     a=rtpmap:0 PCMU/8000
@@ -51,9 +54,9 @@ class Streamer{
                     b=AS:64`
                 }else{
                     data = `v=0
-o=- ${this.input_port} ${this.input_port} IN IP4 192.168.1.3
+o=- ${this.input_port} ${this.input_port} IN IP4 ${UTILS.getLocalIpAddress()}
 s=SDP data
-c=IN IP4 192.168.1.3
+c=IN IP4 ${UTILS.getLocalIpAddress()}
 t=0 0
 m=audio ${this.input_port} RTP/AVP 0 101
 a=rtpmap:0 PCMU/8000

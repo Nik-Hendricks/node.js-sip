@@ -6,15 +6,16 @@ const Builder = require("../../Builder.js");
 const STREAMER = require("./Stream.js")
 const RTPListen = require("./RTPListen.js")
 const Converter = require("./Converter.js")
+const UTILS = require("../../UTILS.js")
 require('dotenv').config({ path: 'CONFIG.env' });
 
 const asteriskDOMAIN = process.env.ASTERISK_DOMAIN;
 const asteriskIP = process.env.ASTERISK_IP;
 const asteriskPort = process.env.ASTERISK_PORT;
-const clientIP = process.env.CLIENT_IP;
-const clientPort = process.env.CLIENT_PORT;
-const username = process.env.USERNAME;
-const password = process.env.PASSWORD;
+const clientIP = UTILS.getLocalIpAddress();
+const clientPort = 6420
+const username = process.env.LOGIN_USERNAME;
+const password = process.env.LOGIN_PASSWORD;
 let callId;
 var Client = new SIP({ip: asteriskIP, port: asteriskPort, username: username, password: password, client_ip: clientIP, client_port: clientPort})
 
@@ -50,7 +51,7 @@ Client.on('INVITE', (res) => {
         var ip = SDPParser.parse(res.message.body).session.origin.split(' ')[5]
         var s = new STREAMER('output_song.wav', ip, port, 'ulaw')
 
-        monitor(port)
+        monitor(212142)
 
         s.start(res.message.headers['User-Agent']).then(sdp => {
             var ok = res.CreateResponse(200)
@@ -60,8 +61,14 @@ Client.on('INVITE', (res) => {
 
         dialog.on('BYE', (res) => {
             console.log("BYE")
+            res.message.headers['Cseq'] = res.message.headers['Cseq'].split(' ')[0] + ' BYE'
             dialog.send(res.CreateResponse(200))
             dialog.kill()
+        })
+
+        dialog.on('CANCEL', (res) => {
+            console.log(`CANCEL from ${res.headers.From.contact.username} at: ${res.headers.From.contact.ip}:${res.headers.From.contact.port}`)
+            dialog.send(res.CreateResponse(200))
         })
     })
 })
@@ -71,9 +78,9 @@ Client.on('INVITE', (res) => {
 function monitor(port){
     var test_sdp = `
 v=0
-o=- 0 0 IN IP4 192.168.1.3
+o=- 0 0 IN IP4 ${UTILS.getLocalIpAddress()}
 s=Stream from Node.js
-c=IN IP4 192.168.1.3
+c=IN IP4 ${UTILS.getLocalIpAddress()}
 t=0 0
 a=tool:libavformat 58.29.100
 m=audio ${port} RTP/AVP 0
@@ -156,5 +163,7 @@ var call = (extension) => {
         dialog.on('180', (res) => {
             console.log(`Ringing ${extension}`)
         })
+
+
     })
 }
