@@ -60,11 +60,13 @@ class Server{
         })
 
         this.SIP.on('REGISTER', (res) => {
+            console.log('first register')
             if(res.GetAuthCredentials().error || !this.SIP.DialogExists(res.tag)){
                 res.message.headers['CSeq'] = `${Parser.getCseq(res.message) + 1} REGISTER`;
                 res.message.headers['WWW-Authenticate'] = "Digest realm=\"NRegistrar\", nonce=\"1234abcd\", algorithm=\"MD5\"";
                 var d = this.SIP.dialog_stack[res.tag]
                 d.on('REGISTER', (res) => {
+                    console.log('second register')
                     //handle second register
                     var username = res.headers.Contact.contact.username
                     if(!res.GetAuthCredentials().error && this.users.hasOwnProperty(username)){
