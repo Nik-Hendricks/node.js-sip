@@ -56,7 +56,8 @@ Client.on('INVITE', (res) => {
         })
 
         dialog.on('CANCEL', (res) => {
-            console.log(`CANCEL from ${res.headers.From.contact.username} at: ${res.headers.From.contact.ip}:${res.headers.From.contact.port}`)
+            console.log(res.headers)
+            console.log(`CANCEL from ${res.headers.From.contact.username} at: ${res.headers.Via.uri.ip}:${res.headers.Via.uri.port}`)
             dialog.send(res.CreateResponse(200))
         })
     })
@@ -70,8 +71,15 @@ s=Stream from Node.js
 c=IN IP4 ${UTILS.getLocalIpAddress()}
 t=0 0
 a=tool:libavformat 58.29.100
-m=audio ${port} RTP/AVP 0
+m=audio ${port} RTP/AVP 0 101
+a=rtpmap:0 PCMU/8000
+a=fmtp:101 0-15
+a=rtpmap:101 telephone-event/8000
+a=ptime:0
+a=sendrecv
 b=AS:64`
+
+
     call_listeners[id] = new RTPListen(test_sdp)
     call_listeners[id].start()
 }
