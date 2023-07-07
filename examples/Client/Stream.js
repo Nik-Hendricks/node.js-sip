@@ -41,17 +41,17 @@ class Streamer{
                 if(useragent.includes('Yealink') || useragent.includes('Tadiran')){
                     console.log("ALT SDP")
                     data = `v=0
-                    o=- ${this.input_port} ${this.input_port} IN IP4 ${UTILS.getLocalIpAddress()}
-                    s=SDP data
-                    c=IN IP4 ${UTILS.getLocalIpAddress()}
-                    t=0 0
-                    m=audio ${this.input_port} RTP/AVP 0 101
-                    a=rtpmap:0 PCMU/8000
-                    a=fmtp:101 0-15
-                    a=rtpmap:101 telephone-event/8000
-                    a=ptime:0
-                    a=sendrecv
-                    b=AS:64`
+                        o=- ${this.input_port} ${this.input_port} IN IP4 ${UTILS.getLocalIpAddress()}
+                        s=SDP data
+                        c=IN IP4 ${UTILS.getLocalIpAddress()}
+                        t=0 0
+                        m=audio ${this.input_port} RTP/AVP 0 101
+                        a=rtpmap:0 PCMU/8000
+                        a=fmtp:101 0-15
+                        a=rtpmap:101 telephone-event/8000
+                        a=ptime:0
+                        a=sendrecv
+                        b=AS:64`
                 }else{
                     data = `v=0
 o=- ${this.input_port} ${this.input_port} IN IP4 ${UTILS.getLocalIpAddress()}

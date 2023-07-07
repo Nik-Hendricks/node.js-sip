@@ -26,8 +26,8 @@ class SIP{
     constructor(props){
         props = (typeof props !== 'undefined') ? props : {};
         this.ip = (typeof props.ip !== 'undefined') ? props.ip : "";
-        this.client_ip = (typeof props.client_ip !== 'undefined') ? props.client_ip : "";
-        this.client_port = (typeof props.client_port !== 'undefined') ? props.client_port : 5060;
+        this.listen_ip = (typeof props.listen_ip !== 'undefined') ? props.listen_ip : "";
+        this.listen_port = (typeof props.listen_port !== 'undefined') ? props.listen_port : 5060;
         this.port = (typeof props.port !== 'undefined') ? props.port : 5060;
         this.username = (typeof props.username !== 'undefined') ? props.username : "";
         this.password = (typeof props.password !== 'undefined') ? props.password : "";
@@ -42,6 +42,9 @@ class SIP{
         this.log_buffer = {}
 
 
+
+        this.Socket.bind(this.listen_port, this.listen_ip)
+        this.Listen()
         this.emitter = new EventEmitter();
 
         return this;
@@ -151,7 +154,9 @@ class SIP{
         return new SIPMessage(this, message);
     }
 
-    Register(){
+    Register(props){
+        this.username = props.username;
+        this.password = props.password;
         return new Promise(resolve => {
             var message = this.Message({
                 isResponse: false,
@@ -159,12 +164,12 @@ class SIP{
                 method: "REGISTER",
                 requestUri: `sip:${this.ip}:${this.port}`,
                 headers: {
-                    'Via': `SIP/2.0/UDP ${this.client_ip}:${this.client_port};branch=${Builder.generateBranch()}`,
-                    'From': `<sip:${this.username}@${this.ip}>;tag=${Builder.generateBranch()}`,
-                    'To': `<sip:${this.username}@${this.ip}>`,
-                    'Call-ID': `${this.callId}@${this.client_ip}`,
+                    'Via': `SIP/2.0/UDP ${this.listen_ip}:${this.listen_port};branch=${Builder.generateBranch()}`,
+                    'From': `<sip:${props.username}@${this.ip}>;tag=${Builder.generateBranch()}`,
+                    'To': `<sip:${props.username}@${this.ip}>`,
+                    'Call-ID': `${this.callId}@${this.listen_ip}`,
                     'CSeq': `1 REGISTER`,
-                    'Contact': `<sip:${this.username}@${this.client_ip}:${this.client_port}>`,
+                    'Contact': `<sip:${props.username}@${this.listen_ip}:${this.listen_port}>`,
                     'Max-Forwards': '70',
                     'User-Agent': 'Node.js SIP Library',
                     'Content-Length': '0'

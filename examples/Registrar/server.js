@@ -3,17 +3,10 @@ const SIP = require("../../SIP.js");
 const SIPMessage = require("../../SIPMessage.js");
 const SDPParser = require("../../SDPParser.js");
 const Parser = require("../../Parser.js");
-//const RTP = require("../../RTP.js");
-//const MediaStream = require("../../Media.js");
 const Builder = require("../../Builder.js");
 const FixNat = require('./FixNat.js')
 const TUI = require('./TUI.js')
 const UTILS = require('../../UTILS.js')
-//const Logger = 
-
-
-
-
 
 class User{
     constructor(props){
@@ -31,9 +24,7 @@ class Server{
     constructor(){
         this.IP = UTILS.getLocalIpAddress();
         this.PORT = 5060;
-        this.SIP = new SIP({type: "server"});
-        this.SIP.Socket.bind(this.PORT, this.IP)
-        this.SIP.Listen()
+        this.SIP = new SIP({listen_ip: this.IP, listen_port: this.PORT});
         this.users = [];
 
     }
@@ -42,40 +33,48 @@ class Server{
         this.SIP.AddNATRoute('172.0.3.75', '72.172.213.173');
         this.SIP.ONMESSAGE((ev) => {
             console.log("-----------Received Message-----------")
+            var m = Parser.parse(ev)
             console.log(ev)
+            //if(typeof m.method !== 'undefined'){
+            //    if(m.method == 'REGISTER'){
+            //        console.log(ev)
+            //    }
+            //}
         })
 
         this.SIP.ONSENDMESSAGE((ev) => {
             ev = JSON.parse(ev)
             console.log(`-----------Sent Message to ${ev.identity.ip}:${ev.identity.port}-----------`)
+            var m = Parser.parse(ev.message)
             console.log(ev.message)
+            //if(typeof m.method !== 'undefined'){
+            //    if(m.method == 'REGISTER'){
+            //        console.log(ev.message)
+            //    }
+            //}
+            //if(typeof m.statusCode !== 'undefined'){
+            //    if(m.statusCode == 401){
+            //        console.log(ev.message)
+            //    }
+            //}
         })
 
         this.SIP.on('REGISTER', (res) => {
-            console.log(!this.SIP.DialogExists(res.tag))
             if(res.GetAuthCredentials().error || !this.SIP.DialogExists(res.tag)){
                 res.message.headers['CSeq'] = `${Parser.getCseq(res.message) + 1} REGISTER`;
-                //res.message.headers.Via = `SIP/2.0/UDP ${this.IP}:${this.PORT};branch=${res.branchId}`
-                //res.message.headers.From = `<sip:NRegistrar@${this.IP}:${this.PORT}>;tag=${res.tag}`
                 res.message.headers['WWW-Authenticate'] = "Digest realm=\"NRegistrar\", nonce=\"1234abcd\", algorithm=\"MD5\"";
                 var d = this.SIP.dialog_stack[res.tag]
                 d.on('REGISTER', (res) => {
+                    //handle second register
                     var username = res.headers.Contact.contact.username
                     if(!res.GetAuthCredentials().error && this.users.hasOwnProperty(username)){
-         
                             this.users[username].ip = res.headers.Contact.contact.ip
                             this.users[username].port = res.headers.Contact.contact.port;
                             this.SIP.send(res.CreateResponse(200),this.GetMemberRoutes(res).contact)
-                        
                     }else{
-                        res.message.headers['CSeq'] = `${Parser.getCseq(res.message) + 1} REGISTER`;
-                        res.message.headers.Via = `SIP/2.0/UDP ${this.IP}:${this.PORT};branch=${res.branchId}`
-                        res.message.headers.From = `<sip:NRegistrar@${this.IP}:${this.PORT}>;tag=${res.tag}`
-                        res.message.headers['WWW-Authenticate'] = "Digest realm=\"NRegistrar\", nonce=\"1234abcd\", algorithm=\"MD5\"";
                         this.SIP.send(res.CreateResponse(401), {port: res.headers.Contact.contact.port, ip: res.headers.Contact.contact.ip})
                     }
                 })
-
                 this.SIP.send(res.CreateResponse(401), {port: res.headers.Contact.contact.port, ip: res.headers.Contact.contact.ip})
             }
         })
@@ -87,15 +86,13 @@ class Server{
                 d.on('INVITE', (res) => {
                         var r = this.GetMemberRoutes(res).to
                         var s = this.GetMemberRoutes(res).from
-                        console.log(res.headers)
-                        if(typeof r.ip !== "undefined" && typeof r.port !== "undefined"){
-                            //res.message.headers['To'] = `<sip:${r.username}@${r.ip}:${r.port}>`
-                            //res.message.headers['Via'] = `SIP/2.0/UDP ${this.IP}:${this.PORT};branch=${res.branchId}`
-                            console.log(r)
-                            console.log((res.headers.Via.uri.ip == r.ip))
+                        console.log(this.GetMemberRoutes(res))
+                        if(typeof s.ip == "undefined" && typeof s.port == "undefined"){
+                            console.log(res.headers)
+                            this.SIP.send(res.CreateResponse(404, {message: 'Not Registered'}), res.headers.Via.uri)
+                        }else if(typeof r.ip !== "undefined" && typeof r.port !== "undefined"){
                             this.SIP.send(res.message, r)
                         }else{
-                            //console.log('user not found')
                             this.SIP.send(res.CreateResponse(404), s)
                         }
                 })
@@ -187,8 +184,6 @@ class Server{
         this.users[user.username] = user;
     }
 }
-
-
 
 var SIPServer = new Server();
 

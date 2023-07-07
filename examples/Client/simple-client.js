@@ -8,30 +8,18 @@ const RTPListen = require("./RTPListen.js")
 const Converter = require("./Converter.js")
 const UTILS = require("../../UTILS.js")
 
-const asteriskDOMAIN = '192.168.2.63';
-const asteriskIP = '192.168.2.63';
+const asteriskDOMAIN = '192.168.1.2';
+const asteriskIP = '192.168.1.2';
 const asteriskPort = 5060;
 const clientIP = UTILS.getLocalIpAddress();
 const clientPort = 6420
 const username = 'Tim'
 const password = '1234';
 let callId;
-var Client = new SIP({ip: asteriskIP, port: asteriskPort, username: username, password: password, client_ip: clientIP, client_port: clientPort})
-
-Client.Socket.bind(clientPort, clientIP)
-
-
-//should make transaction and dialog objects just behaviors of the SIP class.
-//you can use either one to send SIP messages.
-
-
-
 var call_listeners = []
+var Client = new SIP({ip: asteriskIP, port: asteriskPort, listen_ip: clientIP, listen_port: clientPort})
 
-
-Client.Listen();
-
-Client.Register().then(dialog => {
+Client.Register({username: username, password: password}).then(dialog => {
     console.log("REGISTERED")
     //call('200')
     new Converter().convert('song.mp3', 'output_song.wav','ulaw').then(() => {

@@ -19,7 +19,8 @@ class SIPMessage{
         return this;
     }
 
-    CreateResponse(type){
+    CreateResponse(type, props){
+        props = (typeof props !== 'undefined') ? props : {}
         var responses = {
             100: 'Trying',
             180: 'Ringing',
@@ -42,7 +43,7 @@ class SIPMessage{
         r.isResponse = true;
         r.statusCode = type
         delete r.method
-        r.requestUri = `${type} ${responses[Number(type)]}`;
+        r.requestUri = `${type} ${(typeof props.message !== 'undefined') ? props.message : responses[Number(type)]}`;
 
         return r
     }

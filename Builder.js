@@ -7,12 +7,12 @@ const Builder = {
             requestUri: `sip:${props.ip}:${props.port}`,
             protocol: "SIP/2.0",
             headers: {
-                'Via': `SIP/2.0/UDP ${props.client_ip}:${props.client_port};branch=${props.branchId}`,
+                'Via': `SIP/2.0/UDP ${props.listen_ip}:${props.listen_port};branch=${props.branchId}`,
                 'From': `<sip:${props.username}@${props.ip}>;tag=${Builder.generateBranch()}`,
                 'To': `<sip:${props.username}@${props.ip}>`,
-                'Call-ID': `${props.callId}@${props.client_ip}`,
+                'Call-ID': `${props.callId}@${props.listen_ip}`,
                 'CSeq': `${props.cseq} REGISTER`,
-                'Contact': `<sip:${props.username}@${props.client_ip}:${props.client_port}>`,
+                'Contact': `<sip:${props.username}@${props.listen_ip}:${props.listen_port}>`,
                 'Max-Forwards': '70',
                 'Expires': '3600',
                 'User-Agent': 'Node.js SIP Library',
@@ -30,12 +30,12 @@ const Builder = {
             requestUri: `sip:${props.extension}@${props.ip}`,
             protocol: "SIP/2.0",
             headers: {
-                'Via': `SIP/2.0/UDP ${props.client_ip}:${props.client_port};branch=${props.branchId}`,
+                'Via': `SIP/2.0/UDP ${props.listen_ip}:${props.listen_port};branch=${props.branchId}`,
                 'From': `<sip:${props.username}@${props.ip}>;tag=${Builder.generateBranch()}`,
                 'To': `<sip:${props.extension}@${props.ip}>`,
-                'Call-ID': `${props.callId}@${props.client_ip}`,
+                'Call-ID': `${props.callId}@${props.listen_ip}`,
                 'CSeq': `${props.cseq} INVITE`,
-                'Contact': `<sip:${props.username}@${props.client_ip}:${props.client_port}>`,
+                'Contact': `<sip:${props.username}@${props.listen_ip}:${props.listen_port}>`,
                 'Max-Forwards': '70',
                 'User-Agent': 'Node.js SIP Library',
                 'Content-Length': '0'
@@ -52,12 +52,12 @@ const Builder = {
             requestUri: `sip:${props.extension}@${props.ip}`,
             protocol: "SIP/2.0",
             headers: {
-                'Via': `SIP/2.0/UDP ${props.client_ip}:${props.client_port};branch=${props.branchId}`,
+                'Via': `SIP/2.0/UDP ${props.listen_ip}:${props.listen_port};branch=${props.branchId}`,
                 'From': `<sip:${props.username}@${props.ip}>;tag=${Builder.generateBranch()}`,
                 'To': `<sip:${props.extension}@${props.ip}>`,
-                'Call-ID': `${props.callId}@${props.client_ip}`,
+                'Call-ID': `${props.callId}@${props.listen_ip}`,
                 'CSeq': `${props.cseq} BYE`,
-                'Contact': `<sip:${props.username}@${props.client_ip}:${props.client_port}>`,
+                'Contact': `<sip:${props.username}@${props.listen_ip}:${props.listen_port}>`,
                 'Max-Forwards': '70',
                 'User-Agent': 'Node.js SIP Library',
                 'Content-Length': '0'
@@ -74,12 +74,12 @@ const Builder = {
             requestUri: `sip:${props.extension}@${props.ip}`,
             protocol: "SIP/2.0",
             headers: {
-                'Via': `SIP/2.0/UDP ${props.client_ip}:${props.client_port};branch=${props.branchId}`,
+                'Via': `SIP/2.0/UDP ${props.listen_ip}:${props.listen_port};branch=${props.branchId}`,
                 'From': `<sip:${props.username}@${props.ip}>;tag=${Builder.generateBranch()}`,
                 'To': `<sip:${props.extension}@${props.ip}>`,
-                'Call-ID': `${props.callId}@${props.client_ip}`,
+                'Call-ID': `${props.callId}@${props.listen_ip}`,
                 'CSeq': `${props.cseq} 200`,
-                'Contact': `<sip:${props.username}@${props.client_ip}:${props.client_port}>`,
+                'Contact': `<sip:${props.username}@${props.listen_ip}:${props.listen_port}>`,
                 'Max-Forwards': '70',
                 'User-Agent': 'Node.js SIP Library',
                 'Content-Length': '0'
@@ -100,12 +100,12 @@ const Builder = {
             requestUri: `sip:${props.extension}@${props.ip}`,
             protocol: "SIP/2.0",
             headers: {
-                'Via': `SIP/2.0/UDP ${props.client_ip}:${props.client_port};branch=${props.branchId}`,
+                'Via': `SIP/2.0/UDP ${props.listen_ip}:${props.listen_port};branch=${props.branchId}`,
                 'From': `<sip:${props.username}@${props.ip}>;tag=${Builder.generateBranch()}`,
                 'To': `<sip:${props.extension}@${props.ip}>`,
-                'Call-ID': `${props.callId}@${props.client_ip}`,
+                'Call-ID': `${props.callId}@${props.listen_ip}`,
                 'CSeq': `${props.cseq} 180`,
-                'Contact': `<sip:${props.username}@${props.client_ip}:${props.client_port}>`,
+                'Contact': `<sip:${props.username}@${props.listen_ip}:${props.listen_port}>`,
                 'Max-Forwards': '70',
                 'User-Agent': 'Node.js SIP Library',
                 'Content-Length': '0'
@@ -122,12 +122,12 @@ const Builder = {
             requestUri: props.requestUri,
             protocol: "SIP/2.0",
             headers: {
-                'Via': `SIP/2.0/UDP ${props.client_ip}:${props.client_port};branch=${props.branchId}`,
+                'Via': `SIP/2.0/UDP ${props.listen_ip}:${props.listen_port};branch=${props.branchId}`,
                 'From': `<sip:${props.username}@${props.ip}>;tag=${Builder.generateBranch()}`,
                 'To': `<sip:${props.extension}@${props.ip}>`,
-                'Call-ID': `${props.callId}@${props.client_ip}`,
+                'Call-ID': `${props.callId}@${props.listen_ip}`,
                 'CSeq': `${props.cseq} 180`,
-                'Contact': `<sip:${props.username}@${props.client_ip}:${props.client_port}>`,
+                'Contact': `<sip:${props.username}@${props.listen_ip}:${props.listen_port}>`,
                 'Max-Forwards': '70',
                 'User-Agent': 'Node.js SIP Library',
                 'Content-Length': '0'
@@ -160,7 +160,7 @@ const Builder = {
       
         // Add request line
         if (obj.isResponse) {
-          message += `${obj.protocol} ${obj.statusCode} test test\r\n`;
+            message += `${obj.protocol} ${obj.statusCode} ${(typeof obj.requestUri !== 'undefined') ? obj.requestUri.slice(obj.requestUri.indexOf(" ") + 1) : "NRegistrar"}\r\n`;
         } else {
           message += `${obj.method} ${obj.requestUri} ${obj.protocol}\r\n`;
         }
