@@ -7,133 +7,98 @@
         <script src="/js/main.js"></script>
     </head>
     <body>
-        <header class=" mdc-top-app-bar mdc-top-app-bar--dense">
-            <div class="mdc-top-app-bar__row">
-              <section class="mdc-top-app-bar__section mdc-top-app-bar__section--align-start">
-                <button class="mdc-icon-button material-icons mdc-top-app-bar__navigation-icon--unbounded">menu</button><span class="mdc-top-app-bar__title">San Francisco, CA</span> </section>
-              <section class="mdc-top-app-bar__section mdc-top-app-bar__section--align-end">
-                <button class="mdc-icon-button material-icons mdc-top-app-bar__action-item--unbounded" aria-label="Download">file_download</button>
-                <button class="mdc-icon-button material-icons mdc-top-app-bar__action-item--unbounded" aria-label="Print this page">print</button>
-                <button class="mdc-icon-button material-icons mdc-top-app-bar__action-item--unbounded" aria-label="Bookmark this page">bookmark</button>
-              </section>
-            </div>
-          </header>
-        <div class="mdc-data-table">
-            <div class="mdc-data-table__table-container">
-              <table class="mdc-data-table__table" aria-label="Dessert calories">
-                <thead>
-                  <tr class="mdc-data-table__header-row">
-                    <th class="mdc-data-table__header-cell mdc-data-table__header-cell--checkbox" role="columnheader" scope="col">
-                      <div class="mdc-checkbox mdc-data-table__header-row-checkbox mdc-checkbox--selected">
-                        <input type="checkbox" class="mdc-checkbox__native-control" aria-label="Toggle all rows"/>
-                        <div class="mdc-checkbox__background">
-                          <svg class="mdc-checkbox__checkmark" viewBox="0 0 24 24">
-                            <path class="mdc-checkbox__checkmark-path" fill="none" d="M1.73,12.91 8.1,19.28 22.79,4.59" />
-                          </svg>
-                          <div class="mdc-checkbox__mixedmark"></div>
-                        </div>
-                        <div class="mdc-checkbox__ripple"></div>
-                      </div>
-                    </th>
-                    <th class="mdc-data-table__header-cell" role="columnheader" scope="col">Signal name</th>
-                    <th class="mdc-data-table__header-cell" role="columnheader" scope="col">Status</th>
-                    <th class="mdc-data-table__header-cell" role="columnheader" scope="col">Severity</th>
-                    <th class="mdc-data-table__header-cell" role="columnheader" scope="col">Stage</th>
-                    <th class="mdc-data-table__header-cell mdc-data-table__header-cell--numeric" role="columnheader" scope="col">Time</th>
-                    <th class="mdc-data-table__header-cell" role="columnheader" scope="col">Roles</th>
-                  </tr>
-                </thead>
-                <tbody class="mdc-data-table__content">
-                  <tr data-row-id="u0" class="mdc-data-table__row">
-                    <td class="mdc-data-table__cell mdc-data-table__cell--checkbox">
-                      <div class="mdc-checkbox mdc-data-table__row-checkbox">
-                        <input type="checkbox" class="mdc-checkbox__native-control" aria-labelledby="u0"/>
-                        <div class="mdc-checkbox__background">
-                          <svg class="mdc-checkbox__checkmark" viewBox="0 0 24 24">
-                            <path class="mdc-checkbox__checkmark-path" fill="none" d="M1.73,12.91 8.1,19.28 22.79,4.59" />
-                          </svg>
-                          <div class="mdc-checkbox__mixedmark"></div>
-                        </div>
-                        <div class="mdc-checkbox__ripple"></div>
-                      </div>
-                    </td>
-                    <th class="mdc-data-table__cell" scope="row" id="u0">Arcus watch slowdown</th>
-                    <td class="mdc-data-table__cell">Online</td>
-                    <td class="mdc-data-table__cell">Medium</td>
-                    <td class="mdc-data-table__cell">Triaged</td>
-                    <td class="mdc-data-table__cell mdc-data-table__cell--numeric">0:33</td>
-                    <td class="mdc-data-table__cell">Allison Brie</td>
-                  </tr>
-                  <tr data-row-id="u1" class="mdc-data-table__row mdc-data-table__row--selected" aria-selected="true">
-                    <td class="mdc-data-table__cell mdc-data-table__cell--checkbox">
-                      <div class="mdc-checkbox mdc-data-table__row-checkbox mdc-checkbox--selected">
-                        <input type="checkbox" class="mdc-checkbox__native-control" checked aria-labelledby="u1"/>
-                        <div class="mdc-checkbox__background">
-                          <svg class="mdc-checkbox__checkmark" viewBox="0 0 24 24">
-                            <path class="mdc-checkbox__checkmark-path" fill="none" d="M1.73,12.91 8.1,19.28 22.79,4.59" />
-                          </svg>
-                          <div class="mdc-checkbox__mixedmark"></div>
-                        </div>
-                        <div class="mdc-checkbox__ripple"></div>
-                      </div>
-                    </td>
-                    <th class="mdc-data-table__cell" scope="row" id="u1">monarch: prod shared ares-managed-features-provider-heavy</th>
-                    <td class="mdc-data-table__cell">Offline</td>
-                    <td class="mdc-data-table__cell">Huge</td>
-                    <td class="mdc-data-table__cell">Triaged</td>
-                    <td class="mdc-data-table__cell mdc-data-table__cell--numeric">0:33</td>
-                    <td class="mdc-data-table__cell">Brie Larson</td>
-                  </tr>
-                  <tr data-row-id="u2" class="mdc-data-table__row mdc-data-table__row--selected" aria-selected="true">
-                    <td class="mdc-data-table__cell mdc-data-table__cell--checkbox">
-                      <div class="mdc-checkbox mdc-data-table__row-checkbox mdc-checkbox--selected">
-                        <input type="checkbox" class="mdc-checkbox__native-control" checked aria-labelledby="u2"/>
-                        <div class="mdc-checkbox__background">
-                          <svg class="mdc-checkbox__checkmark" viewBox="0 0 24 24">
-                            <path class="mdc-checkbox__checkmark-path" fill="none" d="M1.73,12.91 8.1,19.28 22.79,4.59" />
-                          </svg>
-                          <div class="mdc-checkbox__mixedmark"></div>
-                        </div>
-                        <div class="mdc-checkbox__ripple"></div>
-                      </div>
-                    </td>
-                    <th class="mdc-data-table__cell" scope="row" id="u2">monarch: prod shared ares-managed-features-provider-heavy</th>
-                    <td class="mdc-data-table__cell">Online</td>
-                    <td class="mdc-data-table__cell">Minor</td>
-                    <td class="mdc-data-table__cell">Not triaged</td>
-                    <td class="mdc-data-table__cell mdc-data-table__cell--numeric">0:33</td>
-                    <td class="mdc-data-table__cell">Jeremy Lake</td>
-                  </tr>
-                  <tr data-row-id="u3" class="mdc-data-table__row">
-                    <td class="mdc-data-table__cell mdc-data-table__cell--checkbox">
-                      <div class="mdc-checkbox mdc-data-table__row-checkbox">
-                        <input type="checkbox" class="mdc-checkbox__native-control" aria-labelledby="u3"/>
-                        <div class="mdc-checkbox__background">
-                          <svg class="mdc-checkbox__checkmark" viewBox="0 0 24 24">
-                            <path class="mdc-checkbox__checkmark-path" fill="none" d="M1.73,12.91 8.1,19.28 22.79,4.59" />
-                          </svg>
-                          <div class="mdc-checkbox__mixedmark"></div>
-                        </div>
-                        <div class="mdc-checkbox__ripple"></div>
-                      </div>
-                    </td>
-                    <th class="mdc-data-table__cell" scope="row" id="u3">Arcus watch slowdown</th>
-                    <td class="mdc-data-table__cell">Online</td>
-                    <td class="mdc-data-table__cell">Negligible</td>
-                    <td class="mdc-data-table__cell">Triaged</td>
-                    <td class="mdc-data-table__cell mdc-data-table__cell--numeric">0:33</td>
-                    <td class="mdc-data-table__cell">Angelina Cheng</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <button class="mdc-button mdc-button--outlined">  <span class="mdc-button__ripple"></span> Learn More</button>
-          
+        
     </body>
 </html>
 <style>
+
     body{
         margin:0px;
     }
 </style>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log(mdc)
+
+        var main_content = MainContent()
+
+        var header = Header({
+            title:'Users',
+            buttons:[
+                {
+                    icon:'add',
+                    text:'Add',
+                    onclick:function(){
+                        console.log('add')
+                    }
+                },
+                {
+                    icon:'delete',
+                    text:'Delete',
+                    onclick:function(){
+                        console.log('delete')
+                    }
+                },
+                {
+                    icon:'edit',
+                    text:'Edit',
+                    onclick:function(){
+                        console.log('edit')
+                    }
+                },
+            ]
+        }).root
+
+        var table1 = Table({
+            checkbox: true,
+            cols:['Username','IP','Port','Extension','Status'],
+            rows:[
+                ['user1','192.168.1.1', '5060', '1001', 'Online'],
+                ['user2','192.168.1.1', '5060', '1002', 'Online'],
+                ['user3','192.168.1.1', '5060', '1001', 'Online'],
+                ['user4','192.168.1.1', '5060', '1002', 'Online'],
+                ['user5','192.168.1.1', '5060', '1001', 'Online'],
+                ['user6','192.168.1.1', '5060', '1002', 'Online'],
+                ['user7','192.168.1.1', '5060', '1001', 'Online'],
+                ['user8','192.168.1.1', '5060', '1002', 'Online'],
+                ['user9','192.168.1.1', '5060', '1001', 'Online'],
+                ['user10','192.168.1.1', '5060', '1002', 'Online'],
+            ],
+            style:{
+                "margin": "20px",
+                "width":"calc(100% - 40px)",
+            },
+        })
+        main_content.append(table1)
+        document.body.append(header, main_content)
+        SetTheme('dark')
+
+        var d = Dialog({
+            title:'Add User',
+            content:'<div style="width:100%;height:100%;background-color:red"></div>',
+            buttons:[
+                {
+                    text:'Cancel',
+                    onclick:function(){
+                        console.log('cancel')
+                    }
+                },
+                {
+                    text:'Save',
+                    onclick:function(){
+                        console.log('save')
+                    }
+                }
+            ]
+        })
+
+        console.log(d.focusTrapFactory( d.root, true))
+
+
+        main_content.append(d.root)
+    });
+
+
+
+
+</script>

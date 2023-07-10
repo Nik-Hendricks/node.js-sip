@@ -7,6 +7,7 @@ const Builder = require("../../Builder.js");
 const FixNat = require('./FixNat.js')
 const TUI = require('./TUI.js')
 const UTILS = require('../../UTILS.js')
+const AdminPanelServer = require('../AdminPanel/server.js')
 
 class User{
     constructor(props){
@@ -23,9 +24,11 @@ class User{
 class Server{
     constructor(){
         this.IP = UTILS.getLocalIpAddress();
-        this.PORT = 5060;
+        this.PORT = 5061;
         this.SIP = new SIP({listen_ip: this.IP, listen_port: this.PORT});
         this.users = [];
+        this.adminPanel = new AdminPanelServer()
+        this.adminPanel.start();
 
     }
 
