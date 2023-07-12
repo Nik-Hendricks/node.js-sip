@@ -20,18 +20,27 @@ class AdminPanelServer{
                 filePath = path.join(__dirname, 'html/index.html');
             }
           // Read the file
-          fs.readFile(filePath, (err, data) => {
-            if (err) {
-              // If the file doesn't exist or there was an error reading it, return a 404 response
-              res.writeHead(404, { 'Content-Type': 'text/plain' });
-              res.end('File not found');
-            } else {
-              // If the file exists, set the appropriate headers and serve the file
+
         
-              res.writeHead(200, { 'Content-Type': 'text/html' });
-              res.end(data);
-            }
-          });
+
+            fs.readFile(filePath, (err, data) => {
+                if (err) {
+                    // If the file doesn't exist or there was an error reading it, return a 404 respons
+                      res.writeHead(404, { 'Content-Type': 'text/plain' });
+                      res.end('File not found');
+                } else {
+                    // If the file exists, set the appropriate headers and serve the file
+                    console.log(filePath.split('.')[2])
+                    if(filePath.split('.')[2] == 'css'){
+                        res.writeHead(200, { 'Content-Type': 'text/css' });
+                    }else if(filePath.split('.')[2] == 'js'){
+                        res.writeHead(200, { 'Content-Type': 'text/javascript' });
+                    }else{
+                        res.writeHead(200, { 'Content-Type': 'text/html' });
+                    }
+                    res.end(data);
+                }
+            });
         });
         
         const port = 3000; // Choose the desired port number

@@ -4,10 +4,10 @@
         <link rel="stylesheet" href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css">
         <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp">
         <script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
-        <script src="/js/main.js"></script>
+        <script src="/js/main.js" type="module"></script>
     </head>
     <body>
-        
+
     </body>
 </html>
 <style>
@@ -16,89 +16,3 @@
         margin:0px;
     }
 </style>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log(mdc)
-
-        var main_content = MainContent()
-
-        var header = Header({
-            title:'Users',
-            buttons:[
-                {
-                    icon:'add',
-                    text:'Add',
-                    onclick:function(){
-                        console.log('add')
-                    }
-                },
-                {
-                    icon:'delete',
-                    text:'Delete',
-                    onclick:function(){
-                        console.log('delete')
-                    }
-                },
-                {
-                    icon:'edit',
-                    text:'Edit',
-                    onclick:function(){
-                        console.log('edit')
-                    }
-                },
-            ]
-        }).root
-
-        var table1 = Table({
-            checkbox: true,
-            cols:['Username','IP','Port','Extension','Status'],
-            rows:[
-                ['user1','192.168.1.1', '5060', '1001', 'Online'],
-                ['user2','192.168.1.1', '5060', '1002', 'Online'],
-                ['user3','192.168.1.1', '5060', '1001', 'Online'],
-                ['user4','192.168.1.1', '5060', '1002', 'Online'],
-                ['user5','192.168.1.1', '5060', '1001', 'Online'],
-                ['user6','192.168.1.1', '5060', '1002', 'Online'],
-                ['user7','192.168.1.1', '5060', '1001', 'Online'],
-                ['user8','192.168.1.1', '5060', '1002', 'Online'],
-                ['user9','192.168.1.1', '5060', '1001', 'Online'],
-                ['user10','192.168.1.1', '5060', '1002', 'Online'],
-            ],
-            style:{
-                "margin": "20px",
-                "width":"calc(100% - 40px)",
-            },
-        })
-        main_content.append(table1)
-        document.body.append(header, main_content)
-        SetTheme('dark')
-
-        var d = Dialog({
-            title:'Add User',
-            content:'<div style="width:100%;height:100%;background-color:red"></div>',
-            buttons:[
-                {
-                    text:'Cancel',
-                    onclick:function(){
-                        console.log('cancel')
-                    }
-                },
-                {
-                    text:'Save',
-                    onclick:function(){
-                        console.log('save')
-                    }
-                }
-            ]
-        })
-
-        console.log(d.focusTrapFactory( d.root, true))
-
-
-        main_content.append(d.root)
-    });
-
-
-
-
-</script>

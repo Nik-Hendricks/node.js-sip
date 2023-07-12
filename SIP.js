@@ -155,6 +155,9 @@ class SIP{
     }
 
     Register(props){
+        if(typeof props !== 'object'){
+            return {error: "props must be an object"}
+        }
         this.username = props.username;
         this.password = props.password;
         return new Promise(resolve => {
