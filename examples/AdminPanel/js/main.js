@@ -149,3 +149,7 @@ class App{
 window.app = new App().render('Users')
 console.log(app)
 window.app.Drawer.Open()
+API.get_sip_users().then(res => {
+    console.log(res)
+    console.log('asdf')
+})

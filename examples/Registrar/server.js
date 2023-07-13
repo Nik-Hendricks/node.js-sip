@@ -27,7 +27,7 @@ class Server{
         this.PORT = 5060;
         this.SIP = new SIP({listen_ip: this.IP, listen_port: this.PORT});
         this.users = [];
-        this.adminPanel = new AdminPanelServer()
+        this.adminPanel = new AdminPanelServer(this)
         this.adminPanel.start();
 
     }
@@ -118,7 +118,7 @@ class Server{
                 
                 d.on('200', (res) => {
                     console.log("200 LEVEL 2")
-                    console.log(this.getMemberRoutes(res))
+                    console.log(this.GetMemberRoutes(res))
                     var r = this.GetMemberRoutes(res).from
                     //res.message.headers['To'] = `<sip:${r.username}@${r.ip}:${r.port}>`
                     this.SIP.send(res.CreateResponse(200), r)
