@@ -12,55 +12,95 @@ class Drawer extends HTMLElement{
     connectedCallback(){
         var e = document.createElement('aside');
         var div = document.createElement('div');
-        var nav = document.createElement('nav');
-    
-        e.setAttribute('class', `mdc-drawer mdc-drawer--modal ${this.open ? 'mdc-drawer--open' : ''}`);
+        this.nav = document.createElement('nav');
+
+        e.setAttribute('class', `mdc-drawer mdc-drawer--modal mdc-drawer--open`);
         div.setAttribute('class', 'mdc-drawer__content');
-        nav.setAttribute('class', 'mdc-deprecated-list');
+        this.nav.setAttribute('class', 'mdc-deprecated-list');
     
-        nav.innerHTML = `<a class="mdc-deprecated-list-item mdc-deprecated-list-item--activated" href="#" aria-current="page" tabindex="0">
-                            <span class="mdc-deprecated-list-item__ripple"></span>
-                            <i class="material-icons mdc-deprecated-list-item__graphic" aria-hidden="true">inbox</i>
-                            <span class="mdc-deprecated-list-item__text">Inbox</span>
-                        </a>
-                        <a class="mdc-deprecated-list-item" href="#">
-                            <span class="mdc-deprecated-list-item__ripple"></span>
-                            <i class="material-icons mdc-deprecated-list-item__graphic" aria-hidden="true">send</i>
-                            <span class="mdc-deprecated-list-item__text">Outgoing</span>
-                        </a>`
-    
-        div.append(nav);
+        e.style.transition = 'transform 225ms cubic-bezier(0, 0, 0.2, 1) 0ms'
+
+        div.append(this.nav);
         e.append(div);
     
-        Object.entries(nav.getElementsByTagName('span')).forEach((e) => {
+        Object.entries(this.nav.getElementsByTagName('span')).forEach((e) => {
             e[1].style.color = 'var(--mdc-theme-text-primary)'
         })
     
-        Object.entries(nav.getElementsByTagName('i')).forEach((e) => {
+        Object.entries(this.nav.getElementsByTagName('i')).forEach((e) => {
             e[1].style.color = 'var(--mdc-theme-text-primary)'
         })
     
         this.appendChild(e);
+        this.Update(this.items);
+
+
     }
 
-    exit_listener(e){
-        if(e.target != this && e.target != this.getElementsByTagName('aside')[0] && e.target != this.getElementsByTagName('div')[0] && e.target != this.getElementsByTagName('nav')[0] || e.target == this.getElementsByTagName('header')[0].getElementsByTagName('button')[0]){
-            this.Close();
-            window.removeEventListener('click', this.listener)
+    Update(items){
+        this.nav.innerHTML = '';
+        for(var i = 0; i < items.length; i++){
+            var item = document.createElement('a');
+            var ripple = document.createElement('span');
+            var icon = document.createElement('i');
+            var text = document.createElement('span');
+
+
+            ripple.setAttribute('class', 'mdc-deprecated-list-item__ripple');
+            item.setAttribute('class', 'mdc-deprecated-list-item');
+            icon.setAttribute('class', 'material-icons mdc-deprecated-list-item__graphic');
+            text.setAttribute('class', 'mdc-deprecated-list-item__text');
+
+            icon.innerHTML = items[i].icon;
+            text.innerHTML = items[i].text;
+
+            icon.style.color = 'var(--mdc-theme-text-primary)'
+            text.style.color = 'var(--mdc-theme-text-primary)'
+
+            item.appendChild(ripple);
+            item.appendChild(icon);
+            item.appendChild(text);
+
+            item.onclick = items[i].onclick;
+
+            item.addEventListener('click', () => {
+                this.Close();
+            })
+
+            this.nav.appendChild(item);
         }
+
     }
 
     Open(){
-        this.getElementsByTagName('aside')[0].classList.add('mdc-drawer--open');
+        this.getElementsByTagName('aside')[0].style.transform = 'translateX(0px)';
         this.open = true;
-        this.listener = this.exit_listener.bind(this);
-
-        window.addEventListener('click', this.listener)
+        this.appendChild(this.CloseElement());
     }
 
     Close(){
-        this.getElementsByTagName('aside')[0].classList.remove('mdc-drawer--open');
+        this.getElementsByTagName('aside')[0].style.transform = 'translateX(-100%)';
         this.open = false;
+        this.removeChild(this.getElementsByClassName('close-drawer')[0]);
+    }
+
+    CloseElement(){
+        var close = document.createElement('div');
+        close.style.position = 'absolute'
+        close.style.top = '0px'
+        close.style.right = '0px'
+        close.style.height = '100%'
+        close.style.width = `calc(100% - 256px)`
+        close.style.backgroundColor = 'rgba(0,0,0,0.5)'
+        close.style.zIndex = '1000'
+
+        close.classList.add('close-drawer')
+
+        close.onclick = ((ev) => {
+            this.Close();
+        })
+
+        return close;
     }
 }
 window.customElements.define('mdc-drawer', Drawer);

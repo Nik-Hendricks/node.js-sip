@@ -34,7 +34,7 @@ class Header{
         
         div.getElementsByTagName('button')[0].onclick = (() => {
             var d = document.getElementsByTagName('mdc-drawer')[0]
-            d.Open();
+            window.app.Drawer.Open();
         })
     
         e.appendChild(div);

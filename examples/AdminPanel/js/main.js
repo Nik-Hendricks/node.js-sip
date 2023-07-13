@@ -58,7 +58,31 @@ class App{
             ]
         }).root
         
-        this.Drawer = new Drawer()
+        this.Drawer = new Drawer({items:[
+            {
+                icon:'home',
+                text:'Home',
+                onclick: () => {
+                    this.render('Users')
+                }
+            },
+            {
+                icon:'settings',
+                text:'Settings',
+                onclick: () => {
+                    this.render('Settings')
+                }
+            },
+            {
+                icon:'info',
+                text:'About',
+                onclick: () => {
+                    console.log('test')
+                }
+            },
+        ]})
+
+
         this.MainContent = new MainContent()
 
         this.Views = {
@@ -77,18 +101,42 @@ class App{
                         ['user8','192.168.1.1', '5060', '1002', 'Online'],
                         ['user9','192.168.1.1', '5060', '1001', 'Online'],
                         ['user10','192.168.1.1', '5060', '1002', 'Online'],
-                    ]
+                    ],
+                    style:{
+                        width:'calc(100% - 40px)',
+                        height:'calc(100% - 40px)',
+                        margin:'20px',
+                        
+                    }
                 })
             },
+            Settings: {
+                table: new Table({
+                    checkbox: true,
+                    cols:['Setting','Value'],
+                    rows:[
+                        ['Setting1','Value1'],
+                        ['Setting2','Value2'],
+                        ['Setting3','Value3'],
+                        ['Setting4','Value4'],
+                        ['Setting5','Value5'],
+                        ['Setting6','Value6'],
+                    ],
+                    style:{
+                        width:'calc(100% - 40px)',
+                        height:'calc(100% - 40px)',
+                        margin:'20px',
+                    }
+                })
+            }
         }
+        document.body.style.margin = '0px'
+        document.body.append(this.Header, this.Drawer, this.MainContent)
     }
 
     render(view){
-        document.body.style.margin = '0px'
         this.MainContent.innerHTML = ''
-        document.body.innerHTML = ''
         this.MainContent.append(this.Views[view].table)
-        document.body.append(this.Header, this.Drawer, this.MainContent)
         SetTheme('dark')
         return this
     }
@@ -98,10 +146,6 @@ class App{
 }
 
 
-var app = new App().render('Users')
+window.app = new App().render('Users')
 console.log(app)
-document.addEventListener('DOMContentLoaded', function() {
-    document.body.append(new Dialog().root)
-    app.Drawer.Open()
-
-});
+window.app.Drawer.Open()

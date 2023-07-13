@@ -24,7 +24,7 @@ class User{
 class Server{
     constructor(){
         this.IP = UTILS.getLocalIpAddress();
-        this.PORT = 5061;
+        this.PORT = 5060;
         this.SIP = new SIP({listen_ip: this.IP, listen_port: this.PORT});
         this.users = [];
         this.adminPanel = new AdminPanelServer()
