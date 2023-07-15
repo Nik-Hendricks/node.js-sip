@@ -32,8 +32,8 @@ Client.on('INVITE', (res) => {
     console.log("Received INVITE")
     var d = Client.Dialog(res).then(dialog => {
 
-        dialog.send(res.CreateResponse(100))
-        dialog.send(res.CreateResponse(180))
+        Client.send(res.CreateResponse(100))
+        Client.send(res.CreateResponse(180))
 
         var port = SDPParser.parse(res.message.body).media[0].port
         var ip = SDPParser.parse(res.message.body).session.origin.split(' ')[5]
@@ -44,21 +44,21 @@ Client.on('INVITE', (res) => {
         s.start(res.message.headers['User-Agent']).then(sdp => {
             var ok = res.CreateResponse(200)
             ok.body = sdp
-            dialog.send(ok)
+            Client.send(ok)
             new_listener('test', 21214);
         })
 
         dialog.on('BYE', (res) => {
             console.log("BYE")
             res.message.headers['Cseq'] = res.message.headers['Cseq'].split(' ')[0] + ' BYE'
-            dialog.send(res.CreateResponse(200))
+            Client.send(res.CreateResponse(200))
             dialog.kill()
         })
 
         dialog.on('CANCEL', (res) => {
             console.log(res.headers)
             console.log(`CANCEL from ${res.headers.From.contact.username} at: ${res.headers.Via.uri.ip}:${res.headers.Via.uri.port}`)
-            dialog.send(res.CreateResponse(200))
+            Client.send(res.CreateResponse(200))
         })
     })
 })
@@ -141,12 +141,12 @@ var call = (extension) => {
         dialog.on('401', (res) => {
             var a = message.Authorize(res); //generate authorized message from the original invite request
             console.log(`authorize message for ${extension}`)
-            dialog.send(a)
+            Client.send(a)
         })
 
         dialog.on('200', (res) => {
             console.log(`200 OK ext: ${extension}`)
-            dialog.send(res.CreateResponse(200))
+            Client.send(res.CreateResponse(200))
         })
 
         dialog.on('INVITE', (res) => {

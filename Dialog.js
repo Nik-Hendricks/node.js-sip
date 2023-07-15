@@ -7,31 +7,20 @@ const Parser = require("./Parser");
 const SIPMessage = require("./SIPMessage");
 
 class Dialog{
-    constructor(message){
+    constructor(context, message){
         return new Promise(resolve => {
             this.message = message;
+            this.messages = []
             this.branchId = this.message.branchId
             this.tag = this.message.tag;
             this.events = {};
-            this.message.context.push_to_dialog_stack(this);
-            //send intial request to server through main SIP class socket.
-
+            context.push_to_dialog_stack(this);
             resolve(this)
         })
     }
 
     on(event, callback){
         this.events[event] = callback;
-    }
-
-    send(message){
-        this.message.context.send(message);
-    }
-
-    kill(){
-        delete this.message.context.dialogs[this.tag];
-        //here add logic to detect dialog type and send appropriate message to server.
-
     }
 }
 

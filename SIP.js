@@ -102,6 +102,10 @@ class SIP{
                 var sipMessage = this.FixNAT(this.Message(res_message));
                 var message_ev = sipMessage.message.isResponse ? String(sipMessage.message.statusCode) : sipMessage.message.method;
                 this.push_to_stack(sipMessage);
+                if(typeof this.dialog_stack[sipMessage.tag] !== 'undefined'){
+                    this.dialog_stack[sipMessage.tag].messages.push(sipMessage)
+                }
+   
                 //this.emitter.emit('MESSAGE', Builder.Build(sipMessage.message));
                 this.emitter.emit('MESSAGE', res_message)
                 if (this.DialogExists(sipMessage.tag)) {
@@ -135,6 +139,7 @@ class SIP{
                 this.Socket.send(constructed_message, 0, constructed_message.length, Number(identity.port), identity.ip, (error) => {
                     if (!error) {
                         this.push_to_stack(message);
+                        this.dialog_stack[message.tag].messages.push(message)
                         this.emitter.emit("SENDMESSAGE", JSON.stringify({message: constructed_message, identity: identity}))
                     }
                 });
@@ -144,14 +149,14 @@ class SIP{
 
     Dialog(message){
         return new Promise(resolve => {
-            var dialog = new Dialog(message).then(dialog => {
+            var dialog = new Dialog(this, message).then(dialog => {
                 resolve(dialog);
             })
         })
     }
 
     Message(message){
-        return new SIPMessage(this, message);
+        return new SIPMessage(message);
     }
 
     Register(props){
@@ -184,7 +189,7 @@ class SIP{
 
             this.Dialog(message).then(dialog => {
                 dialog.on('401', (res) => {
-                    var a = message.Authorize(res); //generate authorized message from the original invite request
+                    var a = message.Authorize({username: this.username, password: this.password}, res); //generate authorized message from the original invite request
                     this.send(a)
                 })
 

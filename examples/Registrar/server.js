@@ -7,7 +7,7 @@ const Builder = require("../../Builder.js");
 const FixNat = require('./FixNat.js')
 const TUI = require('./TUI.js')
 const UTILS = require('../../UTILS.js')
-const AdminPanelServer = require('../AdminPanel/server.js')
+const WebAPI = require('../WebAPI/WebAPI.js')
 
 class User{
     constructor(props){
@@ -18,6 +18,16 @@ class User{
         this.port = (typeof props.port !== 'undefined') ? props.port : undefined;
         this.extension = (typeof props.extension !== 'undefined') ? props.extension : undefined;
     }
+
+    toJSON() {
+        return {
+          username: (typeof this.username == 'undefined') ? "" : this.username, 
+          password: (typeof this.password == 'undefined') ? "" : this.password,
+          ip: (typeof this.ip == 'undefined') ? "" : this.ip,
+          port: (typeof this.port == 'undefined') ? "" : this.port,
+          extension: (typeof this.extension == 'undefined') ? "" : this.extension
+        };
+    }
 }
 
 
@@ -27,7 +37,7 @@ class Server{
         this.PORT = 5060;
         this.SIP = new SIP({listen_ip: this.IP, listen_port: this.PORT});
         this.users = [];
-        this.adminPanel = new AdminPanelServer(this)
+        this.adminPanel = new WebAPI(this)
         this.adminPanel.start();
 
     }

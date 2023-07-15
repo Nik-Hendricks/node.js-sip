@@ -3,8 +3,7 @@ const Builder = require('./Builder');
 const SDPParser = require('./SDPParser');
 
 class SIPMessage{
-    constructor(context, obj){
-        this.context = context;
+    constructor(obj){
         this.message = (typeof obj == "string") ? Parser.parse(obj) : obj;
         this.cseq = Parser.getCseq(this.message);
         this.challenge = this.ExtractChallenge();
@@ -74,14 +73,14 @@ class SIPMessage{
         }
     }
 
-    Authorize(challenge_response){
+    Authorize(credentials, challenge_response){
         var message = (typeof this.message == "string") ? Parser.parse(this.message) : this.message;
         challenge_response = (typeof challenge_response == "string") ? Parser.parse(challenge_response) : challenge_response;
         var nonce = challenge_response.headers['WWW-Authenticate'].nonce;
         var realm = challenge_response.headers['WWW-Authenticate'].realm;
-        var response = Builder.DigestResponse(this.context.username, this.context.password, realm, nonce, message.method, `${message.requestUri}`);
+        var response = Builder.DigestResponse(credentials.username, credentials.password, realm, nonce, message.method, `${message.requestUri}`);
         message.headers.CSeq = `${Parser.getCseq(message) + 1} ${message.method}`;
-        message.headers['Authorization'] = `Digest username="${this.context.username}", realm="${realm}", nonce="${nonce}", uri="${message.requestUri}", response="${response}", algorithm=MD5`;
+        message.headers['Authorization'] = `Digest username="${credentials.username}", realm="${realm}", nonce="${nonce}", uri="${message.requestUri}", response="${response}", algorithm=MD5`;
         return message //build message from object.
     }
 }
