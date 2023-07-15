@@ -4,11 +4,15 @@ const HeaderParser = {
       //an example is the CSeq header, which has a count and a method. If you specify the key as CSeq, the function will return an object with the count and method as keys.
       var checks = {
           "From": {contact: HeaderParser.Contact, tag: HeaderParser.Tag},
+          'f': {contact: HeaderParser.Contact, tag: HeaderParser.Tag},
           "To": {contact: HeaderParser.Contact, transport: HeaderParser.Transport, tag: HeaderParser.Tag},
+          't':{contact: HeaderParser.Contact, transport: HeaderParser.Transport, tag: HeaderParser.Tag},
           "Contact": {contact: HeaderParser.Contact, transport: HeaderParser.Transport},
           "Via": {uri: HeaderParser.URI, branch: HeaderParser.branchId},
+          "v":{uri: HeaderParser.URI, branch: HeaderParser.branchId},
           "CSeq": {count: HeaderParser.Cseq, method: HeaderParser.Cseq},
           "WWW-Authenticate": {realm: HeaderParser.Realm, nonce: HeaderParser.Nonce, algorithm: HeaderParser.Algorithm},
+          "Proxy-Authenticate": {realm: HeaderParser.Realm, nonce: HeaderParser.Nonce, algorithm: HeaderParser.Algorithm},
           "Authorization": {realm: HeaderParser.Realm, username: HeaderParser.Username, algorithm: HeaderParser.Algorithm, nonce: HeaderParser.Nonce, response: HeaderParser.Response},
           "Supported": HeaderParser.SpaceSeparated,
           "Allow": HeaderParser.SpaceSeparated,

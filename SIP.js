@@ -139,7 +139,10 @@ class SIP{
                 this.Socket.send(constructed_message, 0, constructed_message.length, Number(identity.port), identity.ip, (error) => {
                     if (!error) {
                         this.push_to_stack(message);
-                        this.dialog_stack[message.tag].messages.push(message)
+                        console.log(message)
+                        if(typeof this.dialog_stack[message.tag] !== 'undefined'){
+                            this.dialog_stack[message.tag].messages.push(message)
+                        }
                         this.emitter.emit("SENDMESSAGE", JSON.stringify({message: constructed_message, identity: identity}))
                     }
                 });
@@ -184,11 +187,16 @@ class SIP{
                 },
                 body: ''
             })
-            console.log(message)
             this.send(message)
 
             this.Dialog(message).then(dialog => {
                 dialog.on('401', (res) => {
+                    console.log(res)
+                    var a = message.Authorize({username: this.username, password: this.password}, res); //generate authorized message from the original invite request
+                    this.send(a)
+                })
+
+                dialog.on('407', (res) => {
                     console.log(res)
                     var a = message.Authorize({username: this.username, password: this.password}, res); //generate authorized message from the original invite request
                     this.send(a)

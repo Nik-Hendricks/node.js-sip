@@ -9,8 +9,8 @@ class SIPMessage{
         this.challenge = this.ExtractChallenge();
         this.headers = Parser.ParseHeaders(this.message.headers);
         if(typeof this.headers !== "undefined"){
-            this.branchId = (typeof this.headers.Via !== "undefined") ? this.headers.Via.branch : Builder.generateBranch();
-            this.tag = (typeof this.headers.From !== "undefined") ? this.headers.From.tag : Builder.generateBranch();
+            this.branchId = (typeof this.headers.Via !== "undefined") ? this.headers.Via.branch : (typeof this.headers.v.branch !== 'undefined') ? this.headers.v.branch :Builder.generateBranch();
+            this.tag = (typeof this.headers.From !== "undefined") ? this.headers.From.tag : (typeof this.headers.f.tag !=='undefined') ? this.headers.f.tag : Builder.generateBranch();
         }else{
             this.branchId = Builder.generateBranch();
             this.tag = Builder.generateBranch();
@@ -74,13 +74,15 @@ class SIPMessage{
     }
 
     Authorize(credentials, challenge_response){
+        var is_proxy_auth = (typeof challenge_response.headers['WWW-Authenticate'] !== 'undefined') ? false : true
+        var headers = challenge_response.headers
         var message = (typeof this.message == "string") ? Parser.parse(this.message) : this.message;
         challenge_response = (typeof challenge_response == "string") ? Parser.parse(challenge_response) : challenge_response;
-        var nonce = challenge_response.headers['WWW-Authenticate'].nonce;
-        var realm = challenge_response.headers['WWW-Authenticate'].realm;
+        var nonce = (is_proxy_auth) ? headers['Proxy-Authenticate'].nonce : headers['WWW-Authenticate'].nonce
+        var realm = (is_proxy_auth) ? headers['Proxy-Authenticate'].realm : headers['WWW-Authenticate'].realm
         var response = Builder.DigestResponse(credentials.username, credentials.password, realm, nonce, message.method, `${message.requestUri}`);
         message.headers.CSeq = `${Parser.getCseq(message) + 1} ${message.method}`;
-        message.headers['Authorization'] = `Digest username="${credentials.username}", realm="${realm}", nonce="${nonce}", uri="${message.requestUri}", response="${response}", algorithm=MD5`;
+        message.headers['Proxy-Authorization'] = `Digest username="${credentials.username}", realm="${realm}", nonce="${nonce}", uri="${message.requestUri}", response="${response}", algorithm=MD5`;
         return message //build message from object.
     }
 }

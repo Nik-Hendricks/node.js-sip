@@ -101,14 +101,12 @@ class Server{
                 d.on('INVITE', (res) => {
                         var r = this.GetMemberRoutes(res).to
                         var s = this.GetMemberRoutes(res).from
-                        console.log(this.ResolveRoute(res))
                         if(typeof s.ip == "undefined" && typeof s.port == "undefined"){
-                            console.log(res.headers)
-                            this.SIP.send(res.CreateResponse(404, {message: 'Not Registered'}), res.headers.Via.uri)
+                            this.ResolveRoute(res).send(res.CreateResponse(404, {message: 'Not Registered'}), res.headers.Via.uri)
                         }else if(typeof r.ip !== "undefined" && typeof r.port !== "undefined"){
-                            this.SIP.send(res.message, r)
+                            this.ResolveRoute(res).send(res.message, r)
                         }else{
-                            this.SIP.send(res.CreateResponse(404), s)
+                            this.ResolveRoute(res).send(res.CreateResponse(404), s)
                         }
                 })
     
@@ -158,8 +156,14 @@ class Server{
     AddTrunk(name, credentials){
         var s = new SIP({ip: credentials.ip, port: credentials.port, listen_ip: UTILS.getLocalIpAddress(), listen_port: 5555})
         s.Register({username:credentials.username, password: credentials.password}).then(res => {
+            console.log(`Regsitered ${name} Trunk`)
+        })
+
+        s.on('INVITE', (res) => {
             console.log(res)
         })
+
+        this.sip_trunks[name] = s
     }
 
     convertToNumber(str) {
@@ -194,12 +198,14 @@ class Server{
 
     ResolveRoute(res){
         var dialed_number = res.headers.To.contact.username
-        if(dialed_number.length == '10'){
-
+        var ret;
+        if(dialed_number.length == 11){
+            ret = this.sip_trunks['callcentric']
+        }else{
+            ret = this.SIP;
         }
 
-
-        return dialed_number
+        return ret
     }
 
     GetMemberRoutes(res){
@@ -225,4 +231,4 @@ SIPServer.AddUser({username: "Joe", password: "1234", extension: "69"})
 SIPServer.AddUser({username: "Nik", password: "1234", extension: "420"})
 SIPServer.AddUser({username: "Billy", password: "1234", extension: "202"})
 SIPServer.AddUser({username: 'ADMIN', passwod:' 1234', extension: '1000'})
-SIPServer.AddTrunk('callcentric', {username: '17778021863', password: '@5S4i8702a', ip:'sip.callcentric.net', port:5060})
+SIPServer.AddTrunk('callcentric', {username: '17778021863100', password: '@5S4i8702a', ip:'sip.callcentric.net', port:5060})

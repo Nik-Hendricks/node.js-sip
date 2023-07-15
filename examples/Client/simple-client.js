@@ -17,11 +17,12 @@ const username = 'Tim'
 const password = '1234';
 let callId;
 var call_listeners = []
-var Client = new SIP({ip: asteriskIP, port: asteriskPort, listen_ip: clientIP, listen_port: clientPort})
 
-Client.Register({username: username, password: password}).then(dialog => {
+var Client = new SIP({ip: 'sip.callcentric.net', port: asteriskPort, listen_ip: clientIP, listen_port: clientPort})
+
+Client.Register({username: '17778021863100', password: '@5S4i8702a'}).then(dialog => {
     console.log("REGISTERED")
-    //call('200')
+    call('4173620296')
     new Converter().convert('song.mp3', 'output_song.wav','ulaw').then(() => {
         console.log('Conversion complete')
     })
