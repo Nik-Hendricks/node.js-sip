@@ -5,7 +5,6 @@ const SDPParser = require("../../SDPParser.js");
 const Parser = require("../../Parser.js");
 const Builder = require("../../Builder.js");
 const FixNat = require('./FixNat.js')
-const TUI = require('./TUI.js')
 const UTILS = require('../../UTILS.js')
 const WebAPI = require('../WebAPI/WebAPI.js')
 
@@ -39,6 +38,7 @@ class Server{
         this.users = [];
         this.adminPanel = new WebAPI(this)
         this.adminPanel.start();
+        this.sip_trunks = []
 
     }
 
@@ -101,7 +101,7 @@ class Server{
                 d.on('INVITE', (res) => {
                         var r = this.GetMemberRoutes(res).to
                         var s = this.GetMemberRoutes(res).from
-                        console.log(this.GetMemberRoutes(res))
+                        console.log(this.ResolveRoute(res))
                         if(typeof s.ip == "undefined" && typeof s.port == "undefined"){
                             console.log(res.headers)
                             this.SIP.send(res.CreateResponse(404, {message: 'Not Registered'}), res.headers.Via.uri)
@@ -128,7 +128,6 @@ class Server{
                 
                 d.on('200', (res) => {
                     console.log("200 LEVEL 2")
-                    console.log(this.GetMemberRoutes(res))
                     var r = this.GetMemberRoutes(res).from
                     //res.message.headers['To'] = `<sip:${r.username}@${r.ip}:${r.port}>`
                     this.SIP.send(res.CreateResponse(200), r)
@@ -153,6 +152,13 @@ class Server{
                 this.SIP.send(res.CreateResponse(401), this.GetMemberRoutes(res).from)
                 return;
             }
+        })
+    }
+
+    AddTrunk(name, credentials){
+        var s = new SIP({ip: credentials.ip, port: credentials.port, listen_ip: UTILS.getLocalIpAddress(), listen_port: 5555})
+        s.Register({username:credentials.username, password: credentials.password}).then(res => {
+            console.log(res)
         })
     }
 
@@ -186,6 +192,16 @@ class Server{
         return ret;
     }
 
+    ResolveRoute(res){
+        var dialed_number = res.headers.To.contact.username
+        if(dialed_number.length == '10'){
+
+        }
+
+
+        return dialed_number
+    }
+
     GetMemberRoutes(res){
         return {
             contact:(typeof res.headers.Contact !== 'undefined') ? this.QueryUser(res.headers.Contact.contact.username) : false,
@@ -209,3 +225,4 @@ SIPServer.AddUser({username: "Joe", password: "1234", extension: "69"})
 SIPServer.AddUser({username: "Nik", password: "1234", extension: "420"})
 SIPServer.AddUser({username: "Billy", password: "1234", extension: "202"})
 SIPServer.AddUser({username: 'ADMIN', passwod:' 1234', extension: '1000'})
+SIPServer.AddTrunk('callcentric', {username: '17778021863', password: '@5S4i8702a', ip:'sip.callcentric.net', port:5060})

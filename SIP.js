@@ -184,11 +184,12 @@ class SIP{
                 },
                 body: ''
             })
-
+            console.log(message)
             this.send(message)
 
             this.Dialog(message).then(dialog => {
                 dialog.on('401', (res) => {
+                    console.log(res)
                     var a = message.Authorize({username: this.username, password: this.password}, res); //generate authorized message from the original invite request
                     this.send(a)
                 })
