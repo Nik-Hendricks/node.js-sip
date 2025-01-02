@@ -1,88 +1,149 @@
-# SIP Library
-This is a Node.js library that provides functionality for working with the Session Initiation Protocol (SIP). It allows you to send and receive SIP messages, register a SIP client, and handle SIP dialogs.
+# node.js-sip
+
+**node.js-sip** is a comprehensive VoIP framework for Node.js. Despite its name, this library goes beyond SIP (Session Initiation Protocol) and offers a full-fledged toolkit for building robust VoIP applications. Leverage its extensive capabilities for SIP transport, registration, messaging, call handling, and more.
 
 ## Features
-1. Send and receive SIP messages using UDP protocol.
-2. Register a SIP client with a SIP server.
-3. Handle SIP dialogs and events.
-4. Generate and parse SIP messages.
 
-## Prerequisites
-Node.js installed on your system.
+- **SIP Transport**: Built-in transport layer supporting UDP.
+- **Client and Server Modes**: Easily switch between User Agent Client (UAC) and User Agent Server (UAS).
+- **Call Handling**: Initiate, accept, reject, and terminate calls.
+- **Message Handling**: Send and receive SIP messages.
+- **Customizable**: Built with modularity and extensibility in mind.
+
 ## Installation
-To use this library in your Node.js project, you need to follow these steps:
 
-Clone the repository or download the source code.
-Navigate to the project directory.
-Install the required dependencies by running the following command:
 ```bash
-npm install
+npm install node.js-sip
 ```
 
-## Usage
-To use the SIP library in your Node.js application, follow these steps:
+## Getting Started
 
-Import the SIP class from the library:
+### Basic Usage
+
+Here's a quick example to demonstrate how to set up a client and make a SIP call.
 
 ```javascript
-const SIP = require("./SIP");
+const VOIP = require('node.js-sip');
+const utils = require('./utils');
+
+const voipClient = new VOIP({
+    type: 'client',
+    transport: {
+        type: 'UDP',
+        ip: utils.getLocalIpAddress(),
+        port: 5060,
+    },
+    username: '1000',
+    register_password: 'yourPassword',
+    register_ip: '192.168.1.2',
+    register_port: 5060,
+}, (response) => {
+    if (response.type === 'REGISTERED') {
+        console.log('Successfully registered with the SIP server.');
+
+        voipClient.call('1001', '192.168.1.3', 5060, (callResponse) => {
+            if (callResponse.type === 'CALL_CONNECTED') {
+                console.log('Call connected!');
+            }
+        });
+    }
+});
 ```
 
-Create a new instance of the SIP class by providing the IP address, port number, username, and password for your SIP client:
+### Setting Up a SIP Server
 
 ```javascript
-const sipClient = new SIP(ip, port, username, password);
+const VOIP = require('node.js-sip');
+
+const voipServer = new VOIP({
+    type: 'server',
+    transport: {
+        type: 'UDP',
+        ip: '0.0.0.0', // Listen on all available IPs
+        port: 5060,
+    },
+}, (response) => {
+    console.log(`Server event: ${response.type}`);
+});
+
+// Handle incoming calls
+voipServer.on('INVITE', (message) => {
+    voipServer.accept(message);
+    console.log('Incoming call accepted.');
+});
 ```
 
-Use the various methods and events provided by the library to interact with the SIP protocol. For example, you can send a SIP message using the send method:
+## API Reference
 
-```javascript
-sipClient.send(message).then(response => {
-    // Handle the response
-})
-```
+### Constructor
 
-Register your SIP client with the SIP server using the Register method:
-```javascript
-sipClient.Register().then(dialog => {
-    // Handle the registration success
-})
+#### `new VOIP(props, callback)`
+- `props`: Configuration object for the VOIP instance.
+  - `type`: `'client'` or `'server'`.
+  - `transport`: Transport configuration.
+    - `type`: `'UDP'` (currently supported).
+    - `ip`: Local IP address for the transport.
+    - `port`: Port for the transport.
+  - `username`: SIP username (for client).
+  - `register_password`: SIP password (for client).
+  - `register_ip`: Registrar IP (for client).
+  - `register_port`: Registrar port (default: `5060`).
+- `callback(response)`: Callback invoked on significant events.
 
-```
+### Methods
 
-Handle SIP events using the on method. For example, you can listen for a 401 Unauthorized resposse:
+#### `call(extension, ip, port, callback)`
+Initiates a call to the specified extension.
+- `extension`: The SIP extension to call.
+- `ip`: The IP address of the callee.
+- `port`: The port of the callee (default: `5060`).
+- `callback(response)`: Callback for call events.
 
-```javascript
-sipClient.on('401', response => {
-  // Handle the 401 response
-});s
-```
+#### `accept(message)`
+Accepts an incoming SIP INVITE message.
+
+#### `reject(message)`
+Rejects an incoming SIP INVITE message.
+
+#### `bye(message)`
+Terminates an ongoing call.
+
+#### `message(extension, body)`
+Sends a SIP MESSAGE to the specified extension.
+- `extension`: The SIP extension to message.
+- `body`: The message body.
 
 ## Examples
-The following examples demonstrate how to use the SIP library:
 
-**Sending a SIP Message:**
-
+### Sending a SIP MESSAGE
 
 ```javascript
-const message = "SIP MESSAGE ";
-
-sipClient.send(message).then(response => {
-    // Handle the response
-})
+voipClient.message('1001', 'Hello, this is a test message!');
 ```
-**Registering a SIP Client:**
+
+### Accepting an Incoming Call
 
 ```javascript
-sipClient.Register().then(dialog => {
-    // Handle the registration success
-})
+voipServer.on('INVITE', (message) => {
+    voipServer.accept(message);
+    console.log('Incoming call accepted.');
+});
 ```
 
-## Contributing
-Contributions are welcome! If you have any bug reports, feature requests, or suggestions, please open an issue on the GitHub repository.
+### Terminating a Call
+
+```javascript
+voipServer.on('BYE', (message) => {
+    voipServer.bye(message);
+    console.log('Call terminated.');
+});
+```
 
 ## License
-Copyright Nicholas Cooley 2023
 
-This library is licensed under the MIT License.
+MIT License. See the [LICENSE](./LICENSE) file for more details.
+
+---
+
+For detailed usage and advanced configurations, refer to the full documentation (coming soon).
+
