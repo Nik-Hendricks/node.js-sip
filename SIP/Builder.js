@@ -83,6 +83,11 @@ const Builder = {
         return `z9hG4bK${branchId}X2`;
     },
 
+    generateTag:() =>{
+        const tag = Math.floor(Math.random() * 10000000000000);
+        return tag;
+    },
+
     /**
     * Builds response to a challenge.
     *

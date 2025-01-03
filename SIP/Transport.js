@@ -29,8 +29,8 @@ const Transports = {
 
     on: (callback) => {
         Transports.socket.on('message', (msg, rinfo) => {
-            //console.log('Received Message')
-            //console.log(msg.toString())
+            console.log('Received Message')
+            console.log(msg.toString())
             callback(msg);
         })
     }

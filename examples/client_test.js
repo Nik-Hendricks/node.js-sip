@@ -17,12 +17,13 @@ var v = new VOIP({
     console.log(`client_test.js > d.type: ${d.type}`)
     if(d.type == 'REGISTERED'){
         //v.message('1001', 'Hello World')
-       v.call('14173620296', 'sip.callcentric.net', 5060, (m) => {
-            console.log(`call callback`)
-            console.log(m)
-            //initiate rtp stream
-
-            
-       });
+        console.log(`REGISTERED`)
+        //v.call('14173620296', 'sip.callcentric.net', 5060, (m) => {
+        //     console.log(`call callback`)
+        //     console.log(m)
+        //});
+    }else if(d.type == 'REGISTER_FAILED'){
+        console.log(`REGISTER_FAILED`)
+        console.log(d.message)
     }
 })
