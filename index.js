@@ -75,7 +75,7 @@ class VOIP{
         var tag = SIP.Parser.ParseHeaders(message.headers).From.tag;
         var branch = SIP.Parser.ParseHeaders(message.headers).Via.branch;
         if(!this.message_stack[tag]){
-            this.message_stack[tag] = [];
+            this.message_stack[tag] = {};
             this.message_stack[tag][branch] = [];
         }
         this.message_stack[tag][branch].push({message, callback: msg_callback})
@@ -123,7 +123,7 @@ class VOIP{
                             let branch = SIP.Parser.ParseHeaders(d.headers).Via.branch;
                             console.log(this.message_stack[tag][branch])
                             console.log('tag > ', tag)
-                            delete this.message_stack[tag]
+                            //delete this.message_stack[tag]
                             props.callId = SIP.Builder.generateBranch();
                             //props.from_tag = tag;
                             this.register(props, callback);
@@ -185,15 +185,15 @@ class VOIP{
             try_count++;
             if(try_count > this.max_retries){
                 console.log('Max retries reached');
-                this.message_stack[h.from_tag].pop();
+                //this.message_stack[h.from_tag].pop();
                 msg_callback({type:'CALL_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
                 return;
             }
             this.send(SIP.Builder.SIPMessageObject('INVITE', h, challenge_headers, proxy_auth), (response) => {
                 if(response.statusCode == 400){
                     console.log('400 Bad Request');
-                    this.message_stack[tag].pop();
-                    this.call(extension, ip, port, msg_callback); //retry
+                    //delete this.message_stack[tag]
+                    //this.call(extension, ip, port, msg_callback); //retry
                     return;
                 }else if (response.statusCode == 401) {
                     let challenge_data = SIP.Parser.ParseHeaders(response.headers)['WWW-Authenticate'];
@@ -206,7 +206,7 @@ class VOIP{
                     return;
                 }else if (response.statusCode == 403) {
                     console.log('403 Forbidden');
-                    this.message_stack[tag].pop();
+                    //delete this.message_stack[tag];
                     msg_callback({type:'CALL_REJECTED', message:response});
                     return;
                 }else if (response.statusCode == 183) {
@@ -233,7 +233,6 @@ class VOIP{
 
                     msg_callback({type:'CALL_CONNECTED', message:response});
                     return;
-                //handle bye
                 }else if (response.method != undefined && response.method == 'BYE') {
                     console.log('BYE Received');
                     //this.bye(response);
