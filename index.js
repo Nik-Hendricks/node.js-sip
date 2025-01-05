@@ -1,10 +1,12 @@
 //Nik Hendricks 10/13/23
 const SIP = require('./SIP')
 const utils = require('./utils')
+const SDPParser = require('./SDP')
 
 class VOIP{
     constructor(props, callback){
         props = props || {};
+        this.SDPParser = SDPParser;
         this.message_stack = {};
         this.transport = this.create_transport(props);
         if(props.type == 'client'){
@@ -77,7 +79,42 @@ class VOIP{
                 check_for_callbacks(tag, branch)
                 return;
             }
-            //need to run callback for client feedback
+
+
+
+
+
+
+
+            //console.log(this.message_stack)
+            //var cb = null;
+            //if(this.message_stack[tag] !== undefined){
+            //    if(this.message_stack[tag][branch] !== undefined){
+            //        if(this.message_stack[tag][branch].length > 0){
+            //            if(this.message_stack[tag][branch][this.message_stack[tag][branch].length - 1].callback != undefined){
+            //                console.log('running message_stack callback')
+            //                cb = this.message_stack[tag][branch][this.message_stack[tag][branch].length - 1].callback;
+            //            }else{
+            //                console.log('No callback')
+            //            }
+            //            if(cb != null){
+            //                cb(res)
+            //            }   
+            //        }else{
+            //            console.log('No messages in stack')
+            //        }
+            //    }else{
+            //        callback({
+            //            type: res.method || res.statusCode,
+            //            message: [res, this.message_stack[tag]]
+            //        })
+            //    }
+            //}else{
+            //    callback({
+            //        type: res.method || res.statusCode,
+            //        message: [res, this.message_stack[tag]]
+            //    })
+            //}
         })
     }
 
@@ -108,7 +145,7 @@ class VOIP{
         }
     }
 
-    register(props, callback){
+    register(props, client_callback){
         var try_count = 0;
         var headers = {
             extension: this.username,
@@ -130,7 +167,7 @@ class VOIP{
             this.registration_cseq++;
             if(try_count > this.max_retries){
                 console.log('Max retries reached');
-                callback({type:'REGISTER_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
+                client_callback({type:'REGISTER_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
                 return;
             }
 
@@ -153,9 +190,9 @@ class VOIP{
                             //delete this.message_stack[tag]
                             props.callId = SIP.Builder.generateBranch();
                             //props.from_tag = tag;
-                            this.register(props, callback);
+                            this.register(props, client_callback);
                         }, expires * 1000);
-                        callback({type:'REGISTERED', message:d})
+                        client_callback({type:'REGISTERED', message:d})
                     }else if(d.statusCode == 401){
                         let challenge_data = SIP.Parser.ParseHeaders(d.headers)['WWW-Authenticate'];
                         //new branch id 
@@ -163,7 +200,7 @@ class VOIP{
                         sendRegister(challenge_data, false);
                     }else if(d.statusCode == 403){
                         console.log(`${d.statusCode} ${d.statusText}`);
-                        callback({type:'REGISTER_FAILED', message:d})
+                        client_callback({type:'REGISTER_FAILED', message:d})
                     }else if(d.statusCode == 407){
                         let challenge_data = SIP.Parser.ParseHeaders(d.headers)['Proxy-Authenticate'];
                         //new branch id
@@ -179,7 +216,7 @@ class VOIP{
         sendRegister();
     }
 
-    call(extension, ip, port, msg_callback){
+    call(extension, ip, port, client_callback){
         var cseq = 1;
         var try_count = 0;
         let b = SIP.Builder.generateBranch();
@@ -213,14 +250,12 @@ class VOIP{
             if(try_count > this.max_retries){
                 console.log('Max retries reached');
                 //this.message_stack[h.from_tag].pop();
-                msg_callback({type:'CALL_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
+                client_callback({type:'CALL_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
                 return;
             }
             this.send(SIP.Builder.SIPMessageObject('INVITE', h, challenge_headers, proxy_auth), (response) => {
                 if(response.statusCode == 400){
                     console.log('400 Bad Request');
-                    //delete this.message_stack[tag]
-                    //this.call(extension, ip, port, msg_callback); //retry
                     return;
                 }else if (response.statusCode == 401) {
                     let challenge_data = SIP.Parser.ParseHeaders(response.headers)['WWW-Authenticate'];
@@ -234,7 +269,7 @@ class VOIP{
                 }else if (response.statusCode == 403) {
                     console.log('403 Forbidden');
                     //delete this.message_stack[tag];
-                    msg_callback({type:'CALL_REJECTED', message:response});
+                    client_callback({type:'CALL_REJECTED', message:response});
                     return;
                 }else if (response.statusCode == 183) {
                     console.log('183 Session Progress');
@@ -243,26 +278,7 @@ class VOIP{
                     console.log('200 OK');
                     console.log('ack')
                     this.ack(response);
-                    //this.ok(response);
-                    //this.send({
-                    //    isResponse: false,
-                    //    protocol: 'SIP/2.0',
-                    //    method: 'ACK',
-                    //    requestUri: `sip:${extension}@${ip}:${port}`,
-                    //    headers: {
-                    //        'Via': `SIP/2.0/UDP ${headers.Via.uri.ip}:${headers.Via.uri.port || 5060};branch=${headers.Via.branch}`,
-                    //        'To': `<sip:${headers.To.contact.username}>`,
-                    //        'From': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>;tag=${headers.From.tag}`,
-                    //        'Call-ID': headers['Call-ID'],
-                    //        'CSeq': `${headers.CSeq.count} ${headers.CSeq.method}`,
-                    //        'Contact': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>`,
-                    //        'Max-Forwards': SIP.Builder.max_forwards,
-                    //        'User-Agent': SIP.Builder.user_agent,
-                    //    },
-                    //    body: ''
-                    //})
-
-                    msg_callback({type:'CALL_CONNECTED', message:response});
+                    client_callback({type:'CALL_CONNECTED', message:response});
                     return;
                 }else if (response.method != undefined && response.method == 'BYE') {
                     console.log('BYE Received');
