@@ -1,9 +1,6 @@
 const crypto = require("crypto");
 const Parser = require("./Parser");
 
-
-
-
 /**
  * The Builder object provides methods for building SIP messages and objects.
  */
@@ -66,7 +63,7 @@ const Builder = {
         }
         let message = '';
         if (obj.isResponse) {
-            message += `SIP/2.0 ${obj.statusCode} ${(typeof obj.requestUri !== 'undefined') ? obj.requestUri.slice(obj.requestUri.indexOf(" ") + 1) : ""}\r\n`;
+            message += `SIP/2.0 ${obj.statusCode} ${obj.statusText} ${(typeof obj.requestUri !== 'undefined') ? obj.requestUri.slice(obj.requestUri.indexOf(" ") + 1) : ""}\r\n`;
         } else {
           message += `${obj.method} ${obj.requestUri} SIP/2.0\r\n`;
         }

@@ -77,42 +77,7 @@ class VOIP{
                 check_for_callbacks(tag, branch)
                 return;
             }
-
-
-
-
-
-
-
-            //console.log(this.message_stack)
-            //var cb = null;
-            //if(this.message_stack[tag] !== undefined){
-            //    if(this.message_stack[tag][branch] !== undefined){
-            //        if(this.message_stack[tag][branch].length > 0){
-            //            if(this.message_stack[tag][branch][this.message_stack[tag][branch].length - 1].callback != undefined){
-            //                console.log('running message_stack callback')
-            //                cb = this.message_stack[tag][branch][this.message_stack[tag][branch].length - 1].callback;
-            //            }else{
-            //                console.log('No callback')
-            //            }
-            //            if(cb != null){
-            //                cb(res)
-            //            }   
-            //        }else{
-            //            console.log('No messages in stack')
-            //        }
-            //    }else{
-            //        callback({
-            //            type: res.method || res.statusCode,
-            //            message: [res, this.message_stack[tag]]
-            //        })
-            //    }
-            //}else{
-            //    callback({
-            //        type: res.method || res.statusCode,
-            //        message: [res, this.message_stack[tag]]
-            //    })
-            //}
+            //need to run callback for client feedback
         })
     }
 
@@ -275,23 +240,27 @@ class VOIP{
                     console.log('183 Session Progress');
                 }else if (response.statusCode == 200) {
                     let headers = SIP.Parser.ParseHeaders(response.headers);
-                    this.send({
-                        isResponse: false,
-                        protocol: 'SIP/2.0',
-                        method: 'ACK',
-                        requestUri: `sip:${extension}@${ip}:${port}`,
-                        headers: {
-                            'Via': `SIP/2.0/UDP ${headers.Via.uri.ip}:${headers.Via.uri.port || 5060};branch=${headers.Via.branch}`,
-                            'To': `<sip:${headers.To.contact.username}>`,
-                            'From': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>;tag=${headers.From.tag}`,
-                            'Call-ID': headers['Call-ID'],
-                            'CSeq': `${headers.CSeq.count} ${headers.CSeq.method}`,
-                            'Contact': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>`,
-                            'Max-Forwards': SIP.Builder.max_forwards,
-                            'User-Agent': SIP.Builder.user_agent,
-                        },
-                        body: ''
-                    })
+                    console.log('200 OK');
+                    console.log('ack')
+                    this.ack(response);
+                    //this.ok(response);
+                    //this.send({
+                    //    isResponse: false,
+                    //    protocol: 'SIP/2.0',
+                    //    method: 'ACK',
+                    //    requestUri: `sip:${extension}@${ip}:${port}`,
+                    //    headers: {
+                    //        'Via': `SIP/2.0/UDP ${headers.Via.uri.ip}:${headers.Via.uri.port || 5060};branch=${headers.Via.branch}`,
+                    //        'To': `<sip:${headers.To.contact.username}>`,
+                    //        'From': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>;tag=${headers.From.tag}`,
+                    //        'Call-ID': headers['Call-ID'],
+                    //        'CSeq': `${headers.CSeq.count} ${headers.CSeq.method}`,
+                    //        'Contact': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>`,
+                    //        'Max-Forwards': SIP.Builder.max_forwards,
+                    //        'User-Agent': SIP.Builder.user_agent,
+                    //    },
+                    //    body: ''
+                    //})
 
                     msg_callback({type:'CALL_CONNECTED', message:response});
                     return;
@@ -390,6 +359,28 @@ class VOIP{
         this.message_stack[headers.From.tag][headers.Via.branch].push({message: new_message})
 
         this.transport.send(SIP.Builder.Build(new_message), headers.Via.uri.ip, headers.Via.uri.port)
+    }
+
+    ack(message){
+        var headers = SIP.Parser.ParseHeaders(message.headers);
+        var new_message = {
+            isResponse: false,
+            protocol: 'SIP/2.0',
+            method: 'ACK',
+            requestUri: `sip:${headers.To.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}`,
+            headers: {
+                'Via': `SIP/2.0/UDP ${headers.Via.uri.ip}:${headers.Via.uri.port || 5060};branch=${headers.Via.branch}`,
+                'To': `<sip:${headers.To.contact.username}>`,
+                'From': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>;tag=${headers.From.tag}`,
+                'Call-ID': headers['Call-ID'],
+                'CSeq': `${headers.CSeq.count} ${headers.CSeq.method}`,
+                'Contact': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>`,
+                'Max-Forwards': SIP.Builder.max_forwards,
+                'User-Agent': SIP.Builder.user_agent,
+            },
+            body: ''
+        }
+        this.send(new_message)
     }
 
     message(extension, body){
