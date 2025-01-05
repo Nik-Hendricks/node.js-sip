@@ -41,31 +41,78 @@ class VOIP{
             var res = SIP.Parser.parse(msg.toString());
             var tag = SIP.Parser.ParseHeaders(res.headers).From.tag;
             var branch = SIP.Parser.ParseHeaders(res.headers).Via.branch;
-
             console.log('tag > ', tag)
             console.log('branch > ', branch)    
             console.log('method > ', res.method || res.statusCode)
 
-            console.log(this.message_stack)
-            var cb = null;
-           
-            if(this.message_stack[tag][branch].length > 0){
-                if(this.message_stack[tag][branch][this.message_stack[tag][branch].length - 1].callback != undefined){
-                    console.log('running message_stack callback')
-                    cb = this.message_stack[tag][branch][this.message_stack[tag][branch].length - 1].callback;
+            let check_for_callbacks = (tag, branch) => {
+                let mg = this.message_stack[tag][branch].filter((m) => {
+                    //remove responses
+                    return m.message.isResponse == false;
+                })
+                let last_mg_func = mg[mg.length - 1].callback;
+                if(last_mg_func != undefined){
+                    last_mg_func(res)
                 }else{
                     console.log('No callback')
                 }
-                this.message_stack[tag][branch].push({message: res})
-                if(cb != null){
-                    cb(res)
+            }
+
+
+            if(this.message_stack[tag] == undefined){
+                this.message_stack[tag] = {};
+                if(this.message_stack[tag][branch] == undefined){
+                    this.message_stack[tag][branch] = [];
+                    this.message_stack[tag][branch].push({message: res})
+                    console.log('brand new stack')
+                    this.uac_responses(msg)
+                    return;
+                }else{
+                    this.message_stack[tag][branch].push({message: res})
+                    check_for_callbacks(tag, branch)
+                    return;
                 }
             }else{
-                callback({
-                    type: res.method || res.statusCode,
-                    message: [res, this.message_stack[tag]]
-                })
+                this.message_stack[tag][branch].push({message: res})
+                check_for_callbacks(tag, branch)
+                return;
             }
+
+
+
+
+
+
+
+            //console.log(this.message_stack)
+            //var cb = null;
+            //if(this.message_stack[tag] !== undefined){
+            //    if(this.message_stack[tag][branch] !== undefined){
+            //        if(this.message_stack[tag][branch].length > 0){
+            //            if(this.message_stack[tag][branch][this.message_stack[tag][branch].length - 1].callback != undefined){
+            //                console.log('running message_stack callback')
+            //                cb = this.message_stack[tag][branch][this.message_stack[tag][branch].length - 1].callback;
+            //            }else{
+            //                console.log('No callback')
+            //            }
+            //            if(cb != null){
+            //                cb(res)
+            //            }   
+            //        }else{
+            //            console.log('No messages in stack')
+            //        }
+            //    }else{
+            //        callback({
+            //            type: res.method || res.statusCode,
+            //            message: [res, this.message_stack[tag]]
+            //        })
+            //    }
+            //}else{
+            //    callback({
+            //        type: res.method || res.statusCode,
+            //        message: [res, this.message_stack[tag]]
+            //    })
+            //}
         })
     }
 
@@ -79,6 +126,21 @@ class VOIP{
             this.message_stack[tag][branch] = [];
         }
         this.message_stack[tag][branch].push({message, callback: msg_callback})
+    }
+
+    uac_responses(msg){
+        var res = SIP.Parser.parse(msg.toString());
+        var tag = SIP.Parser.ParseHeaders(res.headers).From.tag;
+        var branch = SIP.Parser.ParseHeaders(res.headers).Via.branch;
+        var type = res.method || res.statusCode;
+        console.log('tag > ', tag)
+        console.log('branch > ', branch)    
+        console.log('method > ', res.method || res.statusCode)
+        if(type == 'NOTIFY'){
+            console.log('NOTIFY')
+            //respond to NOTIFY
+            this.ok(res)
+        }
     }
 
     register(props, callback){
@@ -308,21 +370,25 @@ class VOIP{
         var headers = SIP.Parser.ParseHeaders(message.headers);
         console.log(headers)
         var new_message = {
-            statusCode: '200 OK',
+            statusCode: '200',
+            statusText: 'OK',
             isResponse: true,
             protocol: 'SIP/2.0',
             headers: {
                 'Via': `SIP/2.0/UDP ${headers.Via.uri.ip}:${headers.Via.uri.port || 5060};branch=${headers.Via.branch}`,
-                'To': `<tel:${headers.To.contact.username}>`,
-                'From': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>;tag=${headers.From.tag}`,
+                'To': `<tel:${headers.From.contact.username}>`,
+                'From': `<sip:${headers.To.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>;tag=${headers.From.tag}`,
                 'Call-ID': headers['Call-ID'],
                 'CSeq': `${headers.CSeq.count} ${headers.CSeq.method}`,
-                'Contact': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>`,
+                'Contact': `<sip:${headers.To.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>`,
                 'Max-Forwards': SIP.Builder.max_forwards,
                 'User-Agent': SIP.Builder.user_agent,
             },
             body: ''
         }
+        console.log(new_message)
+        this.message_stack[headers.From.tag][headers.Via.branch].push({message: new_message})
+
         this.transport.send(SIP.Builder.Build(new_message), headers.Via.uri.ip, headers.Via.uri.port)
     }
 
