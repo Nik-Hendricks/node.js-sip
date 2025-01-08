@@ -23,7 +23,7 @@ class VOIP{
     UAS(props, callback){
     }
 
-    UAC(props, callback){
+    UAC(props, client_callback){
         this.username = props.username;
         this.register_ip = props.register_ip;
         this.register_port = props.register_port;
@@ -36,7 +36,7 @@ class VOIP{
         console.log(props)
 
         this.register(props, (d) => {
-            callback(d);
+            client_callback(d);
         })
 
         this.transport.on((msg) => {
@@ -48,73 +48,38 @@ class VOIP{
             console.log('method > ', res.method || res.statusCode)
 
             let check_for_callbacks = (tag, branch) => {
-                let mg = this.message_stack[tag][branch].filter((m) => {
-                    //remove responses
-                    return m.message.isResponse == false;
-                })
-                let last_mg_func = mg[mg.length - 1].callback;
-                if(last_mg_func != undefined){
-                    last_mg_func(res)
-                }else{
-                    console.log('No callback')
+                console.log('checking for callbacks')
+                let mg = [].concat.apply([], Object.entries(this.message_stack[tag]).map((d => d[1]))).filter((d) => d.sent == true)
+                if(mg.length == 0){
+                    console.log('no callbacks')
+                    return;
                 }
+                let last_mg_func = mg[mg.length - 1].callback;
+                last_mg_func(res)
+                return;
             }
-
 
             if(this.message_stack[tag] == undefined){
                 this.message_stack[tag] = {};
                 if(this.message_stack[tag][branch] == undefined){
                     this.message_stack[tag][branch] = [];
-                    this.message_stack[tag][branch].push({message: res})
+                    this.message_stack[tag][branch].push({message: res, sent: false})
                     console.log('brand new stack')
-                    this.uac_responses(msg)
+                    this.uac_responses(msg, client_callback)
                     return;
                 }else{
-                    this.message_stack[tag][branch].push({message: res})
+                    this.message_stack[tag][branch].push({message: res, sent: false})
                     check_for_callbacks(tag, branch)
                     return;
                 }
             }else{
-                this.message_stack[tag][branch].push({message: res})
+                if(this.message_stack[tag][branch] == undefined){
+                    this.message_stack[tag][branch] = [];
+                }
+                this.message_stack[tag][branch].push({message: res, sent: false})
                 check_for_callbacks(tag, branch)
                 return;
             }
-
-
-
-
-
-
-
-            //console.log(this.message_stack)
-            //var cb = null;
-            //if(this.message_stack[tag] !== undefined){
-            //    if(this.message_stack[tag][branch] !== undefined){
-            //        if(this.message_stack[tag][branch].length > 0){
-            //            if(this.message_stack[tag][branch][this.message_stack[tag][branch].length - 1].callback != undefined){
-            //                console.log('running message_stack callback')
-            //                cb = this.message_stack[tag][branch][this.message_stack[tag][branch].length - 1].callback;
-            //            }else{
-            //                console.log('No callback')
-            //            }
-            //            if(cb != null){
-            //                cb(res)
-            //            }   
-            //        }else{
-            //            console.log('No messages in stack')
-            //        }
-            //    }else{
-            //        callback({
-            //            type: res.method || res.statusCode,
-            //            message: [res, this.message_stack[tag]]
-            //        })
-            //    }
-            //}else{
-            //    callback({
-            //        type: res.method || res.statusCode,
-            //        message: [res, this.message_stack[tag]]
-            //    })
-            //}
         })
     }
 
@@ -127,21 +92,23 @@ class VOIP{
             this.message_stack[tag] = {};
             this.message_stack[tag][branch] = [];
         }
-        this.message_stack[tag][branch].push({message, callback: msg_callback})
+        this.message_stack[tag][branch].push({message, callback: msg_callback, sent: true})
     }
 
-    uac_responses(msg){
+    uac_responses(msg, client_callback){
         var res = SIP.Parser.parse(msg.toString());
         var tag = SIP.Parser.ParseHeaders(res.headers).From.tag;
         var branch = SIP.Parser.ParseHeaders(res.headers).Via.branch;
         var type = res.method || res.statusCode;
-        console.log('tag > ', tag)
-        console.log('branch > ', branch)    
-        console.log('method > ', res.method || res.statusCode)
         if(type == 'NOTIFY'){
-            console.log('NOTIFY')
-            //respond to NOTIFY
+            console.log('uac_responses > NOTIFY')
             this.ok(res)
+        }else if (type == 'INFO') {
+            console.log('uac_responses > INFO')
+            this.ok(res)
+        }else if (type == 'INVITE') {
+            console.log('uac_responses > INVITE')
+            this.accept(res, SIP.Parser.parse(msg.toString()).body, client_callback)
         }
     }
 
@@ -220,14 +187,14 @@ class VOIP{
         var cseq = 1;
         var try_count = 0;
         let b = SIP.Builder.generateBranch();
-        var sdp = ` v=0
-                    o=- 0 0 IN IP4 ${utils.getLocalIpAddress()}
-                    s=Easy Muffin
-                    c=IN IP4 ${utils.getLocalIpAddress()}
-                    t=0 0
-                    a=tool:libavformat 60.16.100
-                    m=audio 10326 RTP/AVP 0
-                    b=AS:64`.replace(/^[ \t]+/gm, '');
+        var sdp = `v=0
+        o=- 123456789 123456789 IN IP4 192.168.1.110
+        s=Asterisk Call
+        c=IN IP4 192.168.1.110
+        t=0 0
+        m=audio 5005 RTP/AVP 8
+        a=rtpmap:8 PCMA/8000
+        a=fmtp:8 0-15`.replace(/^[ \t]+/gm, '');
         
         let h = {
             extension: extension,
@@ -249,11 +216,11 @@ class VOIP{
             try_count++;
             if(try_count > this.max_retries){
                 console.log('Max retries reached');
-                //this.message_stack[h.from_tag].pop();
                 client_callback({type:'CALL_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
                 return;
             }
             this.send(SIP.Builder.SIPMessageObject('INVITE', h, challenge_headers, proxy_auth), (response) => {
+                console.log(response)
                 if(response.statusCode == 400){
                     console.log('400 Bad Request');
                     return;
@@ -273,16 +240,21 @@ class VOIP{
                     return;
                 }else if (response.statusCode == 183) {
                     console.log('183 Session Progress');
+                    return
                 }else if (response.statusCode == 200) {
-                    let headers = SIP.Parser.ParseHeaders(response.headers);
                     console.log('200 OK');
                     console.log('ack')
                     this.ack(response);
-                    client_callback({type:'CALL_CONNECTED', message:response});
+                    client_callback({type:'CALL_CONNECTED', message:response, sdp: response.body});
                     return;
-                }else if (response.method != undefined && response.method == 'BYE') {
+                }else if (response.isResponse == false && response.method == 'BYE') {
                     console.log('BYE Received');
-                    //this.bye(response);
+                    this.ok(response);
+                    return;
+                }else if(response.isResponse == false && response.method == 'INFO'){
+                    console.log('INFO Received');
+                    console.log(response.body)
+                    this.ok(response);
                     return;
                 }else {
                     console.error('Unexpected status code:', response.statusCode);
@@ -293,18 +265,9 @@ class VOIP{
         sendInvite();
     }
 
-    accept(message){
+    accept(message, sdp, client_callback){
         var cseq = 1;
-        var headers = SIP.Parser.ParseHeaders(message.headers);
-        message.isResponse = true;
-        message.statusCode = '100 Trying';
-        var old_body = message.body;
-        message.body = '';
-        message.headers['Contact'] = `<sip:${headers.To.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>`
-        this.send(message)
-        message.statusCode = '180 Ringing';
-        this.send(message)
-        message.body = `v=0
+        let our_sdp = `v=0
                         o=- 123456789 123456789 IN IP4 192.168.1.110
                         s=Asterisk Call
                         c=IN IP4 192.168.1.110
@@ -312,8 +275,16 @@ class VOIP{
                         m=audio 5005 RTP/AVP 8
                         a=rtpmap:8 PCMA/8000
                         a=fmtp:8 0-15`.replace(/^[ \t]+/gm, '');
-        message.statusCode = '200 OK';
-        this.send(message)
+        var headers = SIP.Parser.ParseHeaders(message.headers);
+        this.send(this.response(100, 'Trying', headers))
+        this.send(this.response(180, 'Ringing', headers))
+        this.send(this.response(200, 'OK', headers, our_sdp), (d) => {
+            if(d.isResponse == false && d.method == 'BYE'){
+                this.ok(d);
+                return;
+            }
+        })
+        client_callback({type:'CALL_ACCEPTED', message:message, sdp: sdp});
     }
 
     reject(message){
@@ -371,10 +342,29 @@ class VOIP{
             },
             body: ''
         }
-        console.log(new_message)
-        this.message_stack[headers.From.tag][headers.Via.branch].push({message: new_message})
+        this.send(new_message)
+    }
 
-        this.transport.send(SIP.Builder.Build(new_message), headers.Via.uri.ip, headers.Via.uri.port)
+    response(statusCode, statusText, headers, body){
+        return{
+            statusCode: statusCode,
+            statusText: statusText,
+            isResponse: true,
+            protocol: 'SIP/2.0',
+            headers: {
+                'Via': `SIP/2.0/UDP ${headers.Via.uri.ip}:${headers.Via.uri.port || 5060};branch=${headers.Via.branch}`,
+                'To': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>`,
+                'From': `<sip:${headers.To.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>;tag=${headers.From.tag}`,
+                'Call-ID': headers['Call-ID'],
+                'CSeq': `${headers.CSeq.count} ${headers.CSeq.method}`,
+                'Contact': `<sip:${headers.To.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>`,
+                'Max-Forwards': SIP.Builder.max_forwards,
+                'User-Agent': SIP.Builder.user_agent,
+                'Content-Type': (body) ? 'application/sdp' : '',
+                'Content-Length': (body) ? body.length : 0,
+            },
+            body: body || ''
+        }
     }
 
     ack(message){

@@ -58,28 +58,39 @@ const HeaderParser = {
       }
   },
 
+    //FindKey(str, key){
+  //  //will match values such as "key=value","key="value" but also "key=value;key2=value2" or "key=value,key2="value2""
+//
+  //  var regex = new RegExp(`${key}=(?:"([^"]*)"|([^,;]*))`, "g");
+  //  var match = regex.exec(str);
+  //  if(match !== null){
+  //      var ret = match[1] || match[2];
+  //      if(ret.indexOf(";") > -1){
+  //          ret = ret.split(";")[0];
+  //      }
+  //      if(ret.indexOf(":") > -1){
+  //        ret = ret.split(":")[0];
+  //      }
+  //      if(ret.indexOf(">") > -1){
+  //        ret = ret.split(">")[0];
+  //      }
+  //      return ret;
+//
+  //  }else{
+  //      return false;
+  //  }
+  //},
 
-  FindKey(str, key){
+  FindKey:(str, key) => {
     //will match values such as "key=value","key="value" but also "key=value;key2=value2" or "key=value,key2="value2""
+    //make sure to keep in mind if there is a ; or , in the value, it will be split
 
-    var regex = new RegExp(`${key}=(?:"([^"]*)"|([^,;]*))`, "g");
-    var match = regex.exec(str);
+    var regex = new RegExp(key + "=(\"[^\"]*\"|[^,;]*)");
+    var match = str.match(regex);
     if(match !== null){
-        var ret = match[1] || match[2];
-        if(ret.indexOf(";") > -1){
-            ret = ret.split(";")[0];
-        }
-        if(ret.indexOf(":") > -1){
-          ret = ret.split(":")[0];
-        }
-        if(ret.indexOf(">") > -1){
-          ret = ret.split(">")[0];
-        }
-        return ret;
-
-    }else{
-        return false;
+      return match[1].replace(/"/g, '');
     }
+    return false;
   },
 
   CallID:(str) => {
