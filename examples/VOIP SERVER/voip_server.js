@@ -3,21 +3,16 @@ const SIP = require('../../SIP')
 const VOIP = require('../../')
 const utils = require('../../utils')
 
-class Server{
-    constructor(){
-        var server = new VOIP({
-            type:'server',
-            transport:{
-                type: 'UDP',
-                ip: utils.getLocalIpAddress(),
-                port: 5060,
-            },
-        })
-
-        console.log(server)
-
-        
+var server = new VOIP({
+    type:'server',
+    transport:{
+        type: 'UDP',
+        ip: utils.getLocalIpAddress(),
+        port: 5060,
     }
-}
+},
+(d) => {
+    console.log(d)
+})
 
-new Server()
+console.log(server)

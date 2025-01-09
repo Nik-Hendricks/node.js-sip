@@ -7,23 +7,69 @@ class VOIP{
     constructor(props, callback){
         props = props || {};
         this.SDPParser = SDPParser;
-        this.message_stack = {};
-        this.transport = this.create_transport(props);
+        this.transport = SIP.Transport.new(props);
         if(props.type == 'client'){
             this.UAC(props, callback);
         }else if(props.type == 'server'){
             this.UAS(props, callback);
+            //allow any incoming connections
+            
+            
         }
     }
-
-    create_transport(props, callback){
-        return SIP.Transport.new(props, callback);
-    }
-
+        
     UAS(props, callback){
-    }
+        this.message_stack = {};
+        this.username = 'test';
+        this.password = 'test';
+        this.transport.on((msg) => {
+            var res = SIP.Parser.parse(msg.toString());
+            var tag = SIP.Parser.ParseHeaders(res.headers).From.tag;
+            var branch = SIP.Parser.ParseHeaders(res.headers).Via.branch;
 
+            let check_for_callbacks = (tag, branch) => {
+                console.log('checking for callbacks')
+                let mg = [].concat.apply([], Object.entries(this.message_stack[tag]).map((d => d[1]))).filter((d) => d.sent == true)
+                if(mg.length == 0){
+                    console.log('no callbacks')
+                    return;
+                }
+                //let last_mg_func = mg[mg.length - 1].callback;
+                (mg[mg.length - 1].callback == undefined) ? () => {return} : mg[mg.length - 1].callback(res);
+                //last_mg_func(res)
+                return;
+            }
+
+            if(this.message_stack[tag] == undefined){
+                this.message_stack[tag] = {};
+                if(this.message_stack[tag][branch] == undefined){
+                    this.message_stack[tag][branch] = [];
+                    console.log('brand new stack')
+                    this.uas_responses(msg, callback)
+                    return;
+                }else{
+                    this.message_stack[tag][branch].push({message: res, sent: false})
+                    check_for_callbacks(tag, branch)
+                    return;
+                }
+            }else{
+                if(this.message_stack[tag][branch] == undefined){
+                    this.message_stack[tag][branch] = [];
+                }
+                this.message_stack[tag][branch].push({message: res, sent: false})
+                check_for_callbacks(tag, branch)
+                return;
+            }
+        })
+
+
+
+        callback({type:'UAS_READY'})
+
+    }
+    
     UAC(props, client_callback){
+        this.message_stack = {};
         this.username = props.username;
         this.register_ip = props.register_ip;
         this.register_port = props.register_port;
@@ -54,8 +100,9 @@ class VOIP{
                     console.log('no callbacks')
                     return;
                 }
-                let last_mg_func = mg[mg.length - 1].callback;
-                last_mg_func(res)
+                //let last_mg_func = mg[mg.length - 1].callback;
+                (mg[mg.length - 1].callback == undefined) ? () => {return} : mg[mg.length - 1].callback(res);
+                //last_mg_func(res)
                 return;
             }
 
@@ -81,6 +128,18 @@ class VOIP{
                 return;
             }
         })
+    }
+
+    server_send(message, ip, port, msg_callback){
+        var built = SIP.Builder.Build(message)   
+        this.transport.send(built, ip, port)
+        var tag = SIP.Parser.ParseHeaders(message.headers).From.tag;
+        var branch = SIP.Parser.ParseHeaders(message.headers).Via.branch;
+        if(!this.message_stack[tag]){
+            this.message_stack[tag] = {};
+            this.message_stack[tag][branch] = [];
+        }
+        this.message_stack[tag][branch].push({message, callback: msg_callback, sent: true})
     }
 
     send(message, msg_callback){
@@ -109,6 +168,47 @@ class VOIP{
         }else if (type == 'INVITE') {
             console.log('uac_responses > INVITE')
             this.accept(res, SIP.Parser.parse(msg.toString()).body, client_callback)
+        }
+    }
+
+    uas_responses(msg, client_callback){
+        var res = SIP.Parser.parse(msg.toString());
+        let parsed_headers = SIP.Parser.ParseHeaders(res.headers);
+        console.log(parsed_headers)
+        var tag = parsed_headers.From.tag;
+        var branch = parsed_headers.Via.branch;
+        var type = res.method || res.statusCode;
+        if(type == 'REGISTER'){
+            console.log('uas_responses > REGISTER')
+            //401 Unauthorized
+            let message = this.response({
+                statusCode: 401,
+                statusText: 'Unauthorized',
+                headers: parsed_headers
+            })
+            this.server_send(message, parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port, (d) => {
+                if(d.isResponse == false && d.method == 'REGISTER'){
+                    if(d.headers.Authorization !== undefined){
+                        let response = this.response({
+                            statusCode: 200,
+                            statusText: 'OK',
+                            headers: parsed_headers,
+                            expires: 3600
+                        })
+                        this.server_send(response, parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
+                    }
+                    let headers = SIP.Parser.ParseHeaders(d.headers);
+                    headers['WWW-Authenticate'] = `Digest realm="grandstream",nonce="1736389435/65013889169493b84c1f2b27ed24fba5",opaque="14faa09247973752",algorithm=md5,qop="auth"`
+                    console.log(headers)
+                    let response = this.response({
+                        statusCode: 401,
+                        statusText: 'Unauthorized',
+                        headers: headers
+                    })
+                }else if(d.isResponse == true && d.statusCode == 200){
+                    console.log('REGISTERED')
+                }
+            })
         }
     }
 
@@ -276,9 +376,22 @@ class VOIP{
                         a=rtpmap:8 PCMA/8000
                         a=fmtp:8 0-15`.replace(/^[ \t]+/gm, '');
         var headers = SIP.Parser.ParseHeaders(message.headers);
-        this.send(this.response(100, 'Trying', headers))
-        this.send(this.response(180, 'Ringing', headers))
-        this.send(this.response(200, 'OK', headers, our_sdp), (d) => {
+        this.send(this.response({
+            statusCode: 100,
+            statusText: 'Trying',
+            headers: headers
+        }))
+        this.send(this.response({
+            statusCode: 180,
+            statusText: 'Ringing',
+            headers: headers
+        }))
+        this.send(this.response({
+            statusCode: 200,
+            statusText: 'OK',
+            headers: headers,
+            body: our_sdp
+        }), (d) => {
             if(d.isResponse == false && d.method == 'BYE'){
                 this.ok(d);
                 return;
@@ -322,7 +435,7 @@ class VOIP{
 
     }
 
-    ok(message){
+    ok(message, server_send = false){
         var headers = SIP.Parser.ParseHeaders(message.headers);
         console.log(headers)
         var new_message = {
@@ -342,29 +455,40 @@ class VOIP{
             },
             body: ''
         }
-        this.send(new_message)
+        if(server_send){
+            this.server_send(new_message, headers.Contact.contact.ip, headers.Contact.contact.port)
+        }else{
+            this.send(new_message)
+        }   
     }
 
-    response(statusCode, statusText, headers, body){
-        return{
-            statusCode: statusCode,
-            statusText: statusText,
+    response(props){
+        let ret = {
+            statusCode: props.statusCode,
+            statusText: props.statusText,
             isResponse: true,
             protocol: 'SIP/2.0',
             headers: {
-                'Via': `SIP/2.0/UDP ${headers.Via.uri.ip}:${headers.Via.uri.port || 5060};branch=${headers.Via.branch}`,
-                'To': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>`,
-                'From': `<sip:${headers.To.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>;tag=${headers.From.tag}`,
-                'Call-ID': headers['Call-ID'],
-                'CSeq': `${headers.CSeq.count} ${headers.CSeq.method}`,
-                'Contact': `<sip:${headers.To.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>`,
+                'Via': `SIP/2.0/UDP ${props.headers.Via.uri.ip}:${props.headers.Via.uri.port || 5060};branch=${props.headers.Via.branch}`,
+                'To': `<sip:${props.headers.From.contact.username}@${props.headers.Via.uri.ip}:${props.headers.Via.uri.port || 5060}>`,
+                'From': `<sip:${props.headers.To.contact.username}@${props.headers.Via.uri.ip}:${props.headers.Via.uri.port || 5060}>;tag=${props.headers.From.tag}`,
+                'Call-ID': props.headers['Call-ID'],
+                'CSeq': `${props.headers.CSeq.count} ${props.headers.CSeq.method}`,
+                'Contact': `<sip:${props.headers.To.contact.username}@${props.headers.Via.uri.ip}:${props.headers.Via.uri.port || 5060}>;expires=3600`,
                 'Max-Forwards': SIP.Builder.max_forwards,
                 'User-Agent': SIP.Builder.user_agent,
-                'Content-Type': (body) ? 'application/sdp' : '',
-                'Content-Length': (body) ? body.length : 0,
+                'Content-Type': (props.body) ? 'application/sdp' : '',
+                'Content-Length': (props.body) ? props.body.length : 0,
+                'WWW-Authenticate' : `Digest realm="grandstream",nonce="1736389435/65013889169493b84c1f2b27ed24fba5",opaque="14faa09247973752",algorithm=md5,qop="auth"`
             },
-            body: body || ''
+            body: props.body || ''
+        }   
+
+        if(props.expires){
+            ret.headers.Contact = ret.headers.Contact + `;expires=${props.expires}`;
         }
+
+        return ret;
     }
 
     ack(message){

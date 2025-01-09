@@ -1,5 +1,8 @@
 //Nik Hendricks 10/13/23
 const dgram = require('dgram')
+const utils = require('../utils.js')
+
+console.log(utils.getLocalIpAddress())
 
 const Transports = {
     socket: null,
@@ -11,15 +14,16 @@ const Transports = {
 
     UDP: (props) => {
         Transports.type = 'UDP';
-        Transports.socket = dgram.createSocket('udp4')
-        Transports.socket.bind(props.port, props.ip)
+        Transports.socket = dgram.createSocket('udp4');
+        Transports.socket.bind(props.transport.port, utils.getLocalIpAddress());
     },
 
-    TCP:(props) => {
+    TCP: (props) => {
         Transports.type = 'TCP';
-        Transports.socket = dgram.createSocket('tcp4')
-        Transports.socket.bind(props.port, props.ip)
+        Transports.socket = dgram.createSocket('tcp4');
+        Transports.socket.bind(props.transport.port, utils.getLocalIpAddress());
     },
+
 
     send: (message, ip, port) => {
         console.log('Sending Message')
