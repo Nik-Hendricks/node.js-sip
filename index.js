@@ -8,68 +8,23 @@ class VOIP{
         props = props || {};
         this.SDPParser = SDPParser;
         this.transport = SIP.Transport.new(props);
+        this.message_stack = {};
         if(props.type == 'client'){
             this.UAC(props, callback);
         }else if(props.type == 'server'){
             this.UAS(props, callback);
-            //allow any incoming connections
-            
-            
         }
     }
         
     UAS(props, callback){
-        this.message_stack = {};
         this.username = 'test';
         this.password = 'test';
-        this.transport.on((msg) => {
-            var res = SIP.Parser.parse(msg.toString());
-            var tag = SIP.Parser.ParseHeaders(res.headers).From.tag;
-            var branch = SIP.Parser.ParseHeaders(res.headers).Via.branch;
-
-            let check_for_callbacks = (tag, branch) => {
-                console.log('checking for callbacks')
-                let mg = [].concat.apply([], Object.entries(this.message_stack[tag]).map((d => d[1]))).filter((d) => d.sent == true)
-                if(mg.length == 0){
-                    console.log('no callbacks')
-                    return;
-                }
-                //let last_mg_func = mg[mg.length - 1].callback;
-                (mg[mg.length - 1].callback == undefined) ? () => {return} : mg[mg.length - 1].callback(res);
-                //last_mg_func(res)
-                return;
-            }
-
-            if(this.message_stack[tag] == undefined){
-                this.message_stack[tag] = {};
-                if(this.message_stack[tag][branch] == undefined){
-                    this.message_stack[tag][branch] = [];
-                    console.log('brand new stack')
-                    this.uas_responses(msg, callback)
-                    return;
-                }else{
-                    this.message_stack[tag][branch].push({message: res, sent: false})
-                    check_for_callbacks(tag, branch)
-                    return;
-                }
-            }else{
-                if(this.message_stack[tag][branch] == undefined){
-                    this.message_stack[tag][branch] = [];
-                }
-                this.message_stack[tag][branch].push({message: res, sent: false})
-                check_for_callbacks(tag, branch)
-                return;
-            }
-        })
-
-
+        this.sip_event_listener(callback, 'server');
 
         callback({type:'UAS_READY'})
-
     }
     
     UAC(props, client_callback){
-        this.message_stack = {};
         this.username = props.username;
         this.register_ip = props.register_ip;
         this.register_port = props.register_port;
@@ -79,12 +34,15 @@ class VOIP{
         this.max_retries = 10;
         this.registration_interval = 10;
         this.registration_cseq = 1;
-        console.log(props)
 
         this.register(props, (d) => {
             client_callback(d);
         })
 
+        this.sip_event_listener(client_callback, 'client');
+    }
+
+    sip_event_listener(client_callback, user_agent_type){
         this.transport.on((msg) => {
             var res = SIP.Parser.parse(msg.toString());
             var tag = SIP.Parser.ParseHeaders(res.headers).From.tag;
@@ -112,7 +70,11 @@ class VOIP{
                     this.message_stack[tag][branch] = [];
                     this.message_stack[tag][branch].push({message: res, sent: false})
                     console.log('brand new stack')
-                    this.uac_responses(msg, client_callback)
+                    if(user_agent_type == 'client'){
+                        this.uac_responses(msg, client_callback)
+                    }else if(user_agent_type == 'server'){
+                        this.uas_responses(msg, client_callback)
+                    }
                     return;
                 }else{
                     this.message_stack[tag][branch].push({message: res, sent: false})

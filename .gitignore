@@ -1,0 +1,66 @@
+# Node.js specific
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Logs
+logs
+*.log
+logs/*.log
+debug.log
+error.log
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+jspm_packages/
+web_modules/
+
+# Build files
+dist/
+build/
+out/
+.tmp/
+
+# Runtime files
+*.swp
+*.swo
+*.swn
+*.swx
+*.DS_Store
+
+# VS Code specific
+.vscode/
+.history/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Optional npm cache directory
+.npm/
+
+# Coverage directory
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+
+# IDE Specific
+.idea/
+*.iml
+.project
+.classpath
+
+# Other
+*.bak
+*.orig
