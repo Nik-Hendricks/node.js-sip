@@ -108,6 +108,11 @@ const Builder = {
         const ha2 = crypto.createHash('md5').update(`${method}:${uri}`).digest('hex');
         const response = crypto.createHash('md5').update(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`).digest('hex');
         return response;
+    },        
+
+    generateNonce:(username, password) => {
+        const nonce = crypto.createHash('md5').update(`${username}:${password}:${Math.floor(Math.random() * 10000000000000)}`).digest('hex');
+        return nonce;
     },
 }
 

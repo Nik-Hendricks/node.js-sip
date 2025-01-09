@@ -131,6 +131,8 @@ class VOIP{
     }
 
     server_send(message, ip, port, msg_callback){
+        console.log('server_send')
+        console.log(message)
         var built = SIP.Builder.Build(message)   
         this.transport.send(built, ip, port)
         var tag = SIP.Parser.ParseHeaders(message.headers).From.tag;
@@ -161,10 +163,18 @@ class VOIP{
         var type = res.method || res.statusCode;
         if(type == 'NOTIFY'){
             console.log('uac_responses > NOTIFY')
-            this.ok(res)
+            this.send(this.response({   
+                statusCode: 200,
+                statusText: 'OK',
+                headers: SIP.Parser.ParseHeaders(res.headers)
+            }))  
         }else if (type == 'INFO') {
             console.log('uac_responses > INFO')
-            this.ok(res)
+            this.send(this.response({   
+                statusCode: 200,
+                statusText: 'OK',
+                headers: SIP.Parser.ParseHeaders(res.headers)
+            }))  
         }else if (type == 'INVITE') {
             console.log('uac_responses > INVITE')
             this.accept(res, SIP.Parser.parse(msg.toString()).body, client_callback)
@@ -174,7 +184,6 @@ class VOIP{
     uas_responses(msg, client_callback){
         var res = SIP.Parser.parse(msg.toString());
         let parsed_headers = SIP.Parser.ParseHeaders(res.headers);
-        console.log(parsed_headers)
         var tag = parsed_headers.From.tag;
         var branch = parsed_headers.Via.branch;
         var type = res.method || res.statusCode;
@@ -184,7 +193,8 @@ class VOIP{
             let message = this.response({
                 statusCode: 401,
                 statusText: 'Unauthorized',
-                headers: parsed_headers
+                headers: parsed_headers,
+                auth_required: true
             })
             this.server_send(message, parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port, (d) => {
                 if(d.isResponse == false && d.method == 'REGISTER'){
@@ -197,16 +207,8 @@ class VOIP{
                         })
                         this.server_send(response, parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
                     }
-                    let headers = SIP.Parser.ParseHeaders(d.headers);
-                    headers['WWW-Authenticate'] = `Digest realm="grandstream",nonce="1736389435/65013889169493b84c1f2b27ed24fba5",opaque="14faa09247973752",algorithm=md5,qop="auth"`
-                    console.log(headers)
-                    let response = this.response({
-                        statusCode: 401,
-                        statusText: 'Unauthorized',
-                        headers: headers
-                    })
-                }else if(d.isResponse == true && d.statusCode == 200){
-                    console.log('REGISTERED')
+                }else if(d.isResponse == false && d.method == 'INVITE'){
+                    
                 }
             })
         }
@@ -349,12 +351,20 @@ class VOIP{
                     return;
                 }else if (response.isResponse == false && response.method == 'BYE') {
                     console.log('BYE Received');
-                    this.ok(response);
+                    this.send(this.response({   
+                        statusCode: 200,
+                        statusText: 'OK',
+                        headers: SIP.Parser.ParseHeaders(res.headers)
+                    }))  
                     return;
                 }else if(response.isResponse == false && response.method == 'INFO'){
                     console.log('INFO Received');
                     console.log(response.body)
-                    this.ok(response);
+                    this.send(this.response({   
+                        statusCode: 200,
+                        statusText: 'OK',
+                        headers: SIP.Parser.ParseHeaders(res.headers)
+                    }))  
                     return;
                 }else {
                     console.error('Unexpected status code:', response.statusCode);
@@ -393,7 +403,11 @@ class VOIP{
             body: our_sdp
         }), (d) => {
             if(d.isResponse == false && d.method == 'BYE'){
-                this.ok(d);
+                this.send(this.response({   
+                    statusCode: 200,
+                    statusText: 'OK',
+                    headers: SIP.Parser.ParseHeaders(res.headers)
+                }))  
                 return;
             }
         })
@@ -435,34 +449,10 @@ class VOIP{
 
     }
 
-    ok(message, server_send = false){
-        var headers = SIP.Parser.ParseHeaders(message.headers);
-        console.log(headers)
-        var new_message = {
-            statusCode: '200',
-            statusText: 'OK',
-            isResponse: true,
-            protocol: 'SIP/2.0',
-            headers: {
-                'Via': `SIP/2.0/UDP ${headers.Via.uri.ip}:${headers.Via.uri.port || 5060};branch=${headers.Via.branch}`,
-                'To': `<tel:${headers.From.contact.username}>`,
-                'From': `<sip:${headers.To.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>;tag=${headers.From.tag}`,
-                'Call-ID': headers['Call-ID'],
-                'CSeq': `${headers.CSeq.count} ${headers.CSeq.method}`,
-                'Contact': `<sip:${headers.To.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>`,
-                'Max-Forwards': SIP.Builder.max_forwards,
-                'User-Agent': SIP.Builder.user_agent,
-            },
-            body: ''
-        }
-        if(server_send){
-            this.server_send(new_message, headers.Contact.contact.ip, headers.Contact.contact.port)
-        }else{
-            this.send(new_message)
-        }   
-    }
-
     response(props){
+        //function to calulate nonce and opaque given the username and password
+        let nonce = SIP.Builder.generateNonce(props.username, props.password);
+        let opaque = SIP.Builder.generateNonce(props.username, props.password);
         let ret = {
             statusCode: props.statusCode,
             statusText: props.statusText,
@@ -474,19 +464,28 @@ class VOIP{
                 'From': `<sip:${props.headers.To.contact.username}@${props.headers.Via.uri.ip}:${props.headers.Via.uri.port || 5060}>;tag=${props.headers.From.tag}`,
                 'Call-ID': props.headers['Call-ID'],
                 'CSeq': `${props.headers.CSeq.count} ${props.headers.CSeq.method}`,
-                'Contact': `<sip:${props.headers.To.contact.username}@${props.headers.Via.uri.ip}:${props.headers.Via.uri.port || 5060}>;expires=3600`,
+                'Contact': `<sip:${props.headers.To.contact.username}@${props.headers.Via.uri.ip}:${props.headers.Via.uri.port || 5060}>`,
                 'Max-Forwards': SIP.Builder.max_forwards,
                 'User-Agent': SIP.Builder.user_agent,
-                'Content-Type': (props.body) ? 'application/sdp' : '',
-                'Content-Length': (props.body) ? props.body.length : 0,
-                'WWW-Authenticate' : `Digest realm="grandstream",nonce="1736389435/65013889169493b84c1f2b27ed24fba5",opaque="14faa09247973752",algorithm=md5,qop="auth"`
+                'Content-Length': '0',
             },
             body: props.body || ''
         }   
 
+        if(props.body !== '' && props.body !== undefined){
+            ret.headers['Content-Length'] = props.body.length;
+            ret.headers['Content-Type'] = 'application/sdp';
+        }
+
+        if(props.auth_required == true){
+            ret.headers['WWW-Authenticate'] = `Digest realm="grandstream",nonce="${nonce}",opaque="${opaque}",algorithm=md5,qop="auth"`
+        }
+
         if(props.expires){
             ret.headers.Contact = ret.headers.Contact + `;expires=${props.expires}`;
         }
+
+        console.log(ret)
 
         return ret;
     }

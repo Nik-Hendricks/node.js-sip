@@ -18,10 +18,10 @@ var v = new VOIP({
     if(d.type == 'REGISTERED'){
         //v.message('1001', 'Hello World')
         console.log(`REGISTERED`)
-        //v.call('14173620296', '192.168.1.12', 5060, (m) => {
-        //     console.log(`call callback`)
-        //     console.log(m)
-        //});
+        v.call('14173620296', '192.168.1.12', 5060, (m) => {
+             console.log(`call callback`)
+             console.log(m)
+        });
     }else if(d.type == 'REGISTER_FAILED'){
         console.log(`REGISTER_FAILED`)
         console.log(d.message)
