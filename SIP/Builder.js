@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const Parser = require("./Parser");
+const utils = require("../utils");
 
 
 
@@ -35,11 +36,11 @@ const Builder = {
             protocol: "SIP/2.0",
             headers: {
                 'Via': `SIP/2.0/UDP ${props.register_ip}:${props.register_port};branch=${props.branchId}`,
-                'From': `<sip:${props.username}@${props.ip}>;tag=${props.from_tag || Math.floor(Math.random() * 10000000000000)}`,
-                'To': `<sip:${props.extension}@${props.ip}>`,
-                'Call-ID': `${props.callId}@${props.ip}`,
+                'From': `<sip:${props.username}@${utils.getLocalIpAddress()}>;tag=${props.from_tag || Math.floor(Math.random() * 10000000000000)}`,
+                'To': `<sip:${props.extension}@${props.ip || props.register_ip}>`,
+                'Call-ID': `${props.callId}@${utils.getLocalIpAddress()}`,
                 'CSeq': `${props.cseq} ${props.cseq_method || method.toUpperCase()}`,
-                'Contact': `<sip:${props.username}@${props.ip}:5060>`,
+                'Contact': `<sip:${props.username}@${utils.getLocalIpAddress()}:5060>`,
                 'Max-Forwards': Builder.max_forwards,
                 'User-Agent': Builder.user_agent,
             },
@@ -110,9 +111,12 @@ const Builder = {
         return response;
     },        
 
-    generateNonce:(username, password) => {
-        const nonce = crypto.createHash('md5').update(`${username}:${password}:${Math.floor(Math.random() * 10000000000000)}`).digest('hex');
-        return nonce;
+    generateChallengeNonce:() =>{
+        return crypto.randomBytes(16).toString('hex');
+    },
+
+    generateChallengeOpaque:() =>{
+        return crypto.randomBytes(8).toString('hex');
     },
 }
 

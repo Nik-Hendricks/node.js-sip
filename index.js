@@ -50,8 +50,6 @@ class VOIP{
             console.log('tag > ', tag)
             console.log('branch > ', branch)    
             console.log('method > ', res.method || res.statusCode)
-            console.log('NEW PARSED MESSAGE')
-            console.log(SIP.HeaderParser.parse(res.headers))
 
             let check_for_callbacks = (tag, branch) => {
                 console.log('checking for callbacks')
@@ -146,36 +144,10 @@ class VOIP{
     }
 
     uas_responses(msg, client_callback){
+        //have check for a transparent mode in the future. which is enabled for now.
         var res = SIP.Parser.parse(msg.toString());
-        let parsed_headers = SIP.Parser.ParseHeaders(res.headers);
-        var tag = parsed_headers.From.tag;
-        var branch = parsed_headers.Via.branch;
         var type = res.method || res.statusCode;
-        if(type == 'REGISTER'){
-            console.log('uas_responses > REGISTER')
-            //401 Unauthorized
-            let message = this.response({
-                statusCode: 401,
-                statusText: 'Unauthorized',
-                headers: parsed_headers,
-                auth_required: true
-            })
-            this.server_send(message, parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port, (d) => {
-                if(d.isResponse == false && d.method == 'REGISTER'){
-                    if(d.headers.Authorization !== undefined){
-                        let response = this.response({
-                            statusCode: 200,
-                            statusText: 'OK',
-                            headers: parsed_headers,
-                            expires: 3600
-                        })
-                        this.server_send(response, parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
-                    }
-                }else if(d.isResponse == false && d.method == 'INVITE'){
-                    
-                }
-            })
-        }
+        client_callback({type:type, message:res})
     }
 
     register(props, client_callback){
@@ -249,9 +221,9 @@ class VOIP{
         var try_count = 0;
         let b = SIP.Builder.generateBranch();
         var sdp = `v=0
-        o=- 123456789 123456789 IN IP4 192.168.1.110
-        s=Asterisk Call
-        c=IN IP4 192.168.1.110
+        o=- 123456789 123456789 IN IP4 ${utils.getLocalIpAddress()}
+        s=node.js-sip Call
+        c=IN IP4 ${utils.getLocalIpAddress()}
         t=0 0
         m=audio 5005 RTP/AVP 8
         a=rtpmap:8 PCMA/8000
@@ -260,7 +232,7 @@ class VOIP{
         let h = {
             extension: extension,
             ip: ip,
-            port: port,
+            port: this.port,
             register_ip: this.register_ip,
             register_port: this.register_port,
             username: this.username,
@@ -409,9 +381,10 @@ class VOIP{
     }
 
     response(props){
+        console.log("AUTH REQUIRED", props.auth_required)
         //function to calulate nonce and opaque given the username and password
-        let nonce = SIP.Builder.generateNonce(props.username, props.password);
-        let opaque = SIP.Builder.generateNonce(props.username, props.password);
+        let nonce = SIP.Builder.generateChallengeNonce();
+        let opaque = SIP.Builder.generateChallengeOpaque();
         let ret = {
             statusCode: props.statusCode,
             statusText: props.statusText,
@@ -437,15 +410,12 @@ class VOIP{
         }
 
         if(props.auth_required == true){
-            ret.headers['WWW-Authenticate'] = `Digest realm="grandstream",nonce="${nonce}",opaque="${opaque}",algorithm=md5,qop="auth"`
+            ret.headers['WWW-Authenticate'] = `Digest realm="node.js-sip",nonce="${nonce}",opaque="${opaque}",algorithm=md5,qop="auth"`
         }
 
         if(props.expires){
             ret.headers.Contact = ret.headers.Contact + `;expires=${props.expires}`;
         }
-
-        console.log(ret)
-
         return ret;
     }
 
