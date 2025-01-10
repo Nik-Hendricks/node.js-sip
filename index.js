@@ -50,6 +50,8 @@ class VOIP{
             console.log('tag > ', tag)
             console.log('branch > ', branch)    
             console.log('method > ', res.method || res.statusCode)
+            console.log('NEW PARSED MESSAGE')
+            console.log(SIP.HeaderParser.parse(res.headers))
 
             let check_for_callbacks = (tag, branch) => {
                 console.log('checking for callbacks')
@@ -210,32 +212,26 @@ class VOIP{
                 headers.username = this.username;
                 headers.password = this.register_password;
                 this.send(SIP.Builder.SIPMessageObject('REGISTER', headers, challenge_data, (ph['Proxy-Authenticate'] !== undefined) ? true : false), (d) => {
+                    let parsed_headers = SIP.Parser.ParseHeaders(d.headers);
+
+
                     if(d.statusCode == 200){
-                        let expires = d.headers.Contact.split(';expires=')[1].split(';')[0];
-                        console.log(`REGISTERED for ${expires} seconds`);
+                        console.log(`REGISTERED for ${parsed_headers.Contact.expires} seconds`);
                         setTimeout(() => {
-                            let tag = SIP.Parser.ParseHeaders(d.headers).From.tag;
-                            let branch = SIP.Parser.ParseHeaders(d.headers).Via.branch;
-                            console.log(this.message_stack[tag][branch])
-                            console.log('tag > ', tag)
-                            //delete this.message_stack[tag]
+                            let tag = parsed_headers.From.tag;
+                            let branch = parsed_headers.Via.branch;
                             props.callId = SIP.Builder.generateBranch();
-                            //props.from_tag = tag;
                             this.register(props, client_callback);
-                        }, expires * 1000);
+                        }, parsed_headers.Contact.expires * 1000);
                         client_callback({type:'REGISTERED', message:d})
                     }else if(d.statusCode == 401){
                         let challenge_data = SIP.Parser.ParseHeaders(d.headers)['WWW-Authenticate'];
-                        //new branch id 
-                        //headers.branchId = SIP.Builder.generateBranch();
                         sendRegister(challenge_data, false);
                     }else if(d.statusCode == 403){
                         console.log(`${d.statusCode} ${d.statusText}`);
                         client_callback({type:'REGISTER_FAILED', message:d})
                     }else if(d.statusCode == 407){
                         let challenge_data = SIP.Parser.ParseHeaders(d.headers)['Proxy-Authenticate'];
-                        //new branch id
-                        //headers.branchId = SIP.Builder.generateBranch();
                         sendRegister(challenge_data, true);
                     }else{
                         console.log('Unexpected status code:', d.statusCode);

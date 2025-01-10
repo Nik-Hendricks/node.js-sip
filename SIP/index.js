@@ -3,7 +3,8 @@
 const SIP = {
     Builder: require('./Builder.js'),
     Transport: require('./Transport.js'),
-    Parser: require('./Parser.js'),
+    Parser: require('./Parser.js').Parser,
+    HeaderParser: require('./Parser.js').HeaderParser,
     Dialog: require('./Dialog.js'),
     Transaction: require('./Transaction.js'),
 }
