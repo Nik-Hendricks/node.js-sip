@@ -216,6 +216,7 @@ class VOIP{
 
 
                     if(d.statusCode == 200){
+
                         console.log(`REGISTERED for ${parsed_headers.Contact.expires} seconds`);
                         setTimeout(() => {
                             let tag = parsed_headers.From.tag;

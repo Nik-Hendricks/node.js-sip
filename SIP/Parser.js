@@ -3,11 +3,11 @@ const HeaderParser = {
         // NOTE if you specify a key within the header object, the function will automatically return just the value of that key if it exists.
         //an example is the CSeq header, which has a count and a method. If you specify the key as CSeq, the function will return an object with the count and header name as keys.
         var checks = {
-            "From": {contact: HeaderParser.Contact, tag: HeaderParser.Tag},
-            'f': {contact: HeaderParser.Contact, tag: HeaderParser.Tag},
-            "To": {contact: HeaderParser.Contact, transport: HeaderParser.Transport, tag: HeaderParser.Tag},
-            't':{contact: HeaderParser.Contact, transport: HeaderParser.Transport, tag: HeaderParser.Tag},
-            "Contact": {contact: HeaderParser.Contact, transport: HeaderParser.Transport, expires: HeaderParser.Expires},
+            "From": {contact:HeaderParser.Contact, tag: HeaderParser.Tag},
+            'f': {contact:HeaderParser.Contact, tag: HeaderParser.Tag},
+            "To": {contact:HeaderParser.Contact, transport: HeaderParser.Transport, tag: HeaderParser.Tag},
+            't':{contact:HeaderParser.Contact, transport: HeaderParser.Transport, tag: HeaderParser.Tag},
+            "Contact": {contact:HeaderParser.Contact, transport: HeaderParser.Transport, expires: HeaderParser.Expires},
             "Via": {uri: HeaderParser.URI, branch: HeaderParser.branchId},
             "v":{uri: HeaderParser.URI, branch: HeaderParser.branchId},
             "CSeq": {count: HeaderParser.Cseq, method: HeaderParser.Cseq},
@@ -15,8 +15,21 @@ const HeaderParser = {
             "Proxy-Authenticate": {realm: HeaderParser.Realm, nonce: HeaderParser.Nonce, algorithm: HeaderParser.Algorithm},
             "Authorization": {realm: HeaderParser.Realm, username: HeaderParser.Username, algorithm: HeaderParser.Algorithm, nonce: HeaderParser.Nonce, response: HeaderParser.Response},
             "Supported": HeaderParser.SpaceSeparated,
-            "Allow": HeaderParser.SpaceSeparated,
+            "Allow-Events": HeaderParser.SpaceSeparated,
             "Call-ID": HeaderParser.CallID,
+            "Max-Forwards": (str) => {return parseInt(str)},
+            "Content-Length": (str) => {return parseInt(str)},
+            "Subscription-State": (str) => {return str},
+            "Event": (str) => {return str},
+            "Expires": (str) => {return parseInt(str)},
+            "Content-Type": (str) => {return str},
+            "Content-Disposition": (str) => {return str},
+            "Content-Encoding": (str) => {return str},
+            "Content-Language": (str) => {return str},
+            "User-Agent": (str) => {return str},
+            "Server": (str) => {return str},
+            "Accept": (str) => {return str},
+            "Accept-Encoding": (str) => {return str},
         }
         var ret = {}
         for(var header in headers){
@@ -47,6 +60,7 @@ const HeaderParser = {
         }
         return ret;
     },
+    
     Expires:(str) => {
         if(str.indexOf("expires=") > -1){
             return str.match(/expires=(.*)/)[1];
@@ -128,7 +142,7 @@ const HeaderParser = {
         if (match !== null) {
             return {
                 ip: match[1],
-                port: match[2] ? match[2] : null
+                port: match[2] ? match[2] : null,
             };
         } else {
             return false;
@@ -136,15 +150,18 @@ const HeaderParser = {
     },
 
     Contact:(str) => {
-        var match = str.match(/sip:(.*)/)
+        var match1 = str.match(/sip:(.*)/)
+        var match2 = str.match(/tel:(.*)/)
         var username = HeaderParser.Username(str);
         var ret = {
           username:username,
         }
 
-        if(match !== null){
-          ret.ip = HeaderParser.URI(match[0]).ip;
-          ret.port = HeaderParser.URI(match[0]).port;
+        if(match1 !== null){
+          ret.ip = HeaderParser.URI(match1[0]).ip;
+          ret.port = HeaderParser.URI(match1[0]).port;
+        }else if(match2 !== null){
+            ret.ip = match2[1];
         }
 
         return ret;
