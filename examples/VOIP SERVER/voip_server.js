@@ -11,6 +11,7 @@ const USERS = {
         port:undefined,
         registered:false,
         call_id:undefined,  
+        extension: '1000'
     },
     '1001':{
         password:'rootPassword',
@@ -19,6 +20,7 @@ const USERS = {
         port:undefined,
         registered:false,
         call_id:undefined,  
+        extension: '1001'
     }
 }
 
@@ -32,105 +34,19 @@ var server = new VOIP({
     }
 },
 (d) => {
-    console.log(d)
     if(d.message !== undefined){
         let parsed_headers = SIP.Parser.ParseHeaders(d.message.headers);
         console.log('parsed_headers')
         console.log(parsed_headers)
         if(d.type == 'REGISTER'){
-            let message = server.response({
-                statusCode: 401,
-                statusText: 'Unauthorized',
-                headers: parsed_headers,
-                auth_required: true
-            })
-            USERS[parsed_headers.To.contact.username].nonce = message.headers['WWW-Authenticate'].nonce;
-            server.server_send(message, parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port, (d) => {
-                parsed_headers = SIP.Parser.ParseHeaders(d.headers);
-                if(d.isResponse == false && d.method == 'REGISTER'){
-                    let auth = parsed_headers.Authorization;
-                    if(auth !== undefined){
-                        if(USERS[auth.username] !== undefined){
-                            let client_ip = parsed_headers.Contact.contact.ip;
-                            let client_port = parsed_headers.Contact.contact.port;
-                            USERS[auth.username].ip = client_ip;
-                            USERS[auth.username].port = client_port;
-
-                            var response = server.response({
-                                statusCode: 200,
-                                statusText: 'OK',
-                                headers: parsed_headers,
-                                expires: 3600
-                            })
-
-                            console.log(`REGISTERED ${auth.username}`)
-                            USERS[auth.username].registered = true;
-                            console.log(USERS)
-
-                        }else{
-                            var response = server.response({
-                                statusCode: 401,
-                                statusText: 'Unauthorized',
-                                headers: parsed_headers,
-                                auth_required: true
-                            })
-                        }
-                    }else{
-                        var response = server.response({
-                            statusCode: 401,
-                            statusText: 'Unauthorized',
-                            headers: parsed_headers,
-                            auth_required: true
-                        })
-                    }
-                    server.server_send(response, parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
-                }
+            server.uas_handle_registration(d.message, USERS, (response) => {
+                console.log('response')
+                console.log(response)
             })
         }else if(d.type == 'INVITE'){
-            let message = server.response({
-                statusCode: 401,
-                statusText: 'Unauthorized',
-                headers: parsed_headers,
-                auth_required: true
-            })
-            server.server_send(message, parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port, (d) => {
-                parsed_headers = SIP.Parser.ParseHeaders(d.headers);
-                if(d.isResponse == false && d.method == 'INVITE'){
-                    let auth = parsed_headers.Authorization;
-                    if(auth !== undefined){
-                        if(USERS[auth.username] !== undefined){
-
-
-                            var response = server.response({
-                                statusCode: 200,
-                                statusText: 'OK',
-                                headers: parsed_headers,
-                                expires: 3600
-                            })
-
-                            console.log(`INVITE ${auth.username}`)
-                            USERS[auth.username].registered = true;
-                            console.log(USERS)
-
-                        }else{
-                            var response = server.response({
-                                statusCode: 401,
-                                statusText: 'Unauthorized',
-                                headers: parsed_headers,
-                                auth_required: true
-                            })
-                        }
-                    }else{
-                        var response = server.response({
-                            statusCode: 401,
-                            statusText: 'Unauthorized',
-                            headers: parsed_headers,
-                            auth_required: true
-                        })
-                    }
-                    
-                    server.server_send(response, parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
-                }
+            server.uas_handle_invite(d.message, USERS, (response) => {
+                console.log('response')
+                console.log(response)
             })
             
         }

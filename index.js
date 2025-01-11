@@ -9,6 +9,7 @@ class VOIP{
         this.SDPParser = SDPParser;
         this.transport = SIP.Transport.new(props);
         this.message_stack = {};
+        this.type = props.type;
         if(props.type == 'client'){
             this.UAC(props, callback);
         }else if(props.type == 'server'){
@@ -17,11 +18,8 @@ class VOIP{
     }
         
     UAS(props, callback){
-        this.username = 'test';
-        this.password = 'test';
-        this.sip_event_listener(callback, 'server');
-
         callback({type:'UAS_READY'})
+        this.sip_event_listener(callback, 'server');
     }
     
     UAC(props, client_callback){
@@ -44,6 +42,10 @@ class VOIP{
 
     sip_event_listener(client_callback, user_agent_type){
         this.transport.on((msg) => {
+            console.log(msg.toString().length)
+            if(msg.toString().length <= 4){
+                return;
+            }
             var res = SIP.Parser.parse(msg.toString());
             var tag = SIP.Parser.ParseHeaders(res.headers).From.tag;
             var branch = SIP.Parser.ParseHeaders(res.headers).Via.branch;
@@ -52,15 +54,21 @@ class VOIP{
             console.log('method > ', res.method || res.statusCode)
 
             let check_for_callbacks = (tag, branch) => {
-                console.log('checking for callbacks')
                 let mg = [].concat.apply([], Object.entries(this.message_stack[tag]).map((d => d[1]))).filter((d) => d.sent == true)
                 if(mg.length == 0){
-                    console.log('no callbacks')
                     return;
                 }
-                //let last_mg_func = mg[mg.length - 1].callback;
-                (mg[mg.length - 1].callback == undefined) ? () => {return} : mg[mg.length - 1].callback(res);
-                //last_mg_func(res)
+                var c = null;            
+                for(var i = mg.length - 1; i >= 0; i--){
+                    if(mg[i].callback !== undefined){
+                        c = mg[i].callback;
+                        break;
+                    }
+                }
+                if(c == null){
+                    return;
+                }
+                c(res);
                 return;
             }
 
@@ -93,8 +101,6 @@ class VOIP{
     }
 
     server_send(message, ip, port, msg_callback){
-        console.log('server_send')
-        console.log(message)
         var built = SIP.Builder.Build(message)   
         this.transport.send(built, ip, port)
         var tag = SIP.Parser.ParseHeaders(message.headers).From.tag;
@@ -150,15 +156,117 @@ class VOIP{
         client_callback({type:type, message:res})
     }
 
+    uas_handle_registration(msg, users, client_callback){
+        console.log('uas_handle_registration')
+        var parsed_headers = SIP.Parser.ParseHeaders(msg.headers);
+        let client_username = parsed_headers.Contact.contact.username;
+        let client_ip = parsed_headers.Contact.contact.ip;
+        let client_port = parsed_headers.Contact.contact.port;
+        console.log(parsed_headers)
+
+        if(users[client_username] !== undefined){
+            users[client_username].ip = client_ip;
+            users[client_username].port = client_port;
+            this.server_send(this.response({
+                statusCode: 401,
+                statusText: 'Unauthorized',
+                headers: parsed_headers,
+                auth_required: true
+            }), client_ip, client_port, (d) => {
+                parsed_headers = SIP.Parser.ParseHeaders(d.headers);
+                if(d.method == 'REGISTER'){
+                    if(parsed_headers.Authorization !== undefined){
+                        users[client_username].registered = true;
+                        console.log(users)
+                        this.server_send(this.response({
+                            statusCode: 200,
+                            statusText: 'OK',
+                            headers: parsed_headers,
+                            expires: 3600
+                        }), client_ip, client_port)
+                    }else{
+                        this.server_send(this.response({
+                            statusCode: 401,
+                            statusText: 'Unauthorized',
+                            headers: parsed_headers,
+                            auth_required: true
+                        }), client_ip, client_port)
+                    }
+                }
+            })
+        }else{
+            this.server_send(this.response({
+                statusCode: 403,
+                statusText: 'Forbidden',
+                headers: parsed_headers,
+            }), client_ip, client_port)
+        }
+    }
+
+    uas_handle_invite(msg, users, client_callback){
+        var parsed_headers = SIP.Parser.ParseHeaders(msg.headers);
+        this.server_send(this.response({
+            statusCode: 401,
+            statusText: 'Unauthorized',
+            headers: parsed_headers,
+            auth_required: true
+        }), parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port, (d) => {
+            parsed_headers = SIP.Parser.ParseHeaders(d.headers);
+            console.log('parsed_headers')
+            console.log(parsed_headers)
+            if(d.isResponse == false && d.method == 'INVITE'){
+                let auth = parsed_headers.Authorization;
+                if(auth !== undefined){
+                    if(users[auth.username] !== undefined){
+                        let callee = parsed_headers.To.contact.username;
+                        console.log(`INVITE ${callee}`)
+                        //this.call(callee, users[auth.username].ip, users[auth.username].port, (m) => {
+                        //    console.log('call callback')
+                        //    console.log(m)
+                        //});
+
+                        this.call2({username:auth.username, to: callee, ip: users[callee].ip, port: users[callee].port, client_callback: (d) => {
+                            console.log('call callback')
+                            console.log(d)
+                        }})
+
+                        //var response = this.response({
+                        //    statusCode: 200,
+                        //    statusText: 'OK',
+                        //    headers: parsed_headers,
+                        //    expires: 3600
+                        //})
+
+                        //console.log(`INVITE ${auth.username}`)
+                        //console.log(users)
+
+                    }else{
+                        this.server_send(this.response({
+                            statusCode: 401,
+                            statusText: 'Unauthorized',
+                            headers: parsed_headers,
+                            auth_required: true
+                        }), parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
+                    }
+                }else{
+                    this.server_send(this.response({
+                        statusCode: 401,
+                        statusText: 'Unauthorized',
+                        headers: parsed_headers,
+                        auth_required: true
+                    }), parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
+                }
+            }
+        })
+    }
+
     register(props, client_callback){
         var try_count = 0;
         var headers = {
-            extension: this.username,
-            ip: this.ip,
-            port: this.port,
+            to: this.username,
+            ip: this.register_ip,
+            port: this.register_port,
             requestUri: `sip:${this.register_ip}`,
-            register_ip: this.register_ip,
-            register_port: this.register_port,
             username: this.username,
             callId: props.callId || '123',
             cseq: this.registration_cseq,
@@ -216,6 +324,102 @@ class VOIP{
         sendRegister();
     }
 
+    call2(props){
+        var cseq = 1;
+        var try_count = 0;
+        var sdp = `v=0
+        o=- 123456789 123456789 IN IP4 ${utils.getLocalIpAddress()}
+        s=node.js-sip Call
+        c=IN IP4 ${utils.getLocalIpAddress()}
+        t=0 0
+        m=audio 5005 RTP/AVP 8
+        a=rtpmap:8 PCMA/8000
+        a=fmtp:8 0-15`.replace(/^[ \t]+/gm, '');
+
+        let h = {
+            to: props.to,
+            ip: props.ip,
+            port: props.port,
+            username: props.username,
+            callId: SIP.Builder.generateBranch(),
+            cseq: cseq,
+            branchId: SIP.Builder.generateBranch(),
+            from_tag: SIP.Builder.generateTag(),
+            body: sdp,
+            password: this.register_password,
+            requestUri: `sip:${props.to}@${props.ip}:${props.port}`,
+        };
+
+        const sendInvite = (challenge_headers, proxy_auth = false) => {
+            try_count++;
+            if(try_count > this.max_retries){
+                console.log('Max retries reached');
+                props.client_callback({type:'CALL_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
+                return;
+            }
+            let inv_responses = (response) => {
+                if(response.statusCode == 400){
+                    console.log('400 Bad Request');
+                    return;
+                }else if (response.statusCode == 401) {
+                    let challenge_data = SIP.Parser.ParseHeaders(response.headers)['WWW-Authenticate'];
+                    sendInvite(challenge_data, false);
+                }else if(response.statusCode == 407){
+                    let challenge_data = SIP.Parser.ParseHeaders(response.headers)['Proxy-Authenticate'];
+                    sendInvite(challenge_data, true);
+                }else if (response.statusCode == 100) {
+                    console.log('100 Trying');
+                    return;
+                }else if (response.statusCode == 403) {
+                    console.log('403 Forbidden');
+                    props.client_callback({type:'CALL_REJECTED', message:response});
+                    return;
+                }else if (response.statusCode == 183) {
+                    console.log('183 Session Progress');
+                    return
+                }else if (response.statusCode == 200) {
+                    this.ack(response);
+                    props.client_callback({type:'CALL_CONNECTED', message:response, sdp: response.body});
+                    return;
+                }else if (response.isResponse == false && response.method == 'BYE') {
+                    console.log('BYE Received');
+                    this.send(this.response({   
+                        statusCode: 200,
+                        statusText: 'OK',
+                        headers: SIP.Parser.ParseHeaders(res.headers)
+                    }))  
+                    return;
+                }else if(response.isResponse == false && response.method == 'INFO'){
+                    console.log('INFO Received');
+                    console.log(response.body)
+                    this.send(this.response({   
+                        statusCode: 200,
+                        statusText: 'OK',
+                        headers: SIP.Parser.ParseHeaders(res.headers)
+                    }))  
+                    return;
+                }else {
+                    console.error('Unexpected status code:', response.statusCode);
+                }
+            }
+
+            let inv_message = SIP.Builder.SIPMessageObject('INVITE', h, challenge_headers, proxy_auth);
+
+            if(this.type == 'server'){
+                this.server_send(inv_message, h.ip, h.port, (response) => {
+                    inv_responses(response)
+                });
+            }else if(this.type == 'client'){
+                this.send(inv_message, (response) => {
+                    inv_responses(response)
+                });
+            }
+        };
+        
+        sendInvite();
+
+    }
+
     call(extension, ip, port, client_callback){
         var cseq = 1;
         var try_count = 0;
@@ -233,8 +437,8 @@ class VOIP{
             extension: extension,
             ip: ip,
             port: this.port,
-            register_ip: this.register_ip,
-            register_port: this.register_port,
+            register_ip: this.register_ip || utils.getLocalIpAddress(),
+            register_port: this.register_port || 5060,
             username: this.username,
             callId: SIP.Builder.generateBranch(),
             cseq: cseq,
@@ -381,8 +585,6 @@ class VOIP{
     }
 
     response(props){
-        console.log("AUTH REQUIRED", props.auth_required)
-        //function to calulate nonce and opaque given the username and password
         let nonce = SIP.Builder.generateChallengeNonce();
         let opaque = SIP.Builder.generateChallengeOpaque();
         let ret = {
