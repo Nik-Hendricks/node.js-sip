@@ -2,13 +2,14 @@
 const dgram = require('dgram')
 const utils = require('../utils.js')
 
-console.log(utils.getLocalIpAddress())
 
 const Transports = {
     socket: null,
     type: null,
+    port: null,
     new: (props) => {
         Transports[props.transport.type](props)
+        Transports.port = props.transport.port;
         return Transports;
     },
 

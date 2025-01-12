@@ -18,6 +18,7 @@ class VOIP{
     }
         
     UAS(props, callback){
+        this.TrunkManager = new SIP.TrunkManager(VOIP); //need to pass the VOIP class through so that new UACs can be created as the Trunks.
         callback({type:'UAS_READY'})
         this.sip_event_listener(callback, 'server');
     }
@@ -42,7 +43,6 @@ class VOIP{
 
     sip_event_listener(client_callback, user_agent_type){
         this.transport.on((msg) => {
-            console.log(msg.toString().length)
             if(msg.toString().length <= 4){
                 return;
             }
@@ -225,7 +225,7 @@ class VOIP{
                         //    console.log(m)
                         //});
 
-                        this.call2({username:auth.username, to: callee, ip: users[callee].ip, port: users[callee].port, client_callback: (d) => {
+                        this.call({username:auth.username, to: callee, ip: users[callee].ip, port: users[callee].port, client_callback: (d) => {
                             console.log('call callback')
                             console.log(d)
                         }})
@@ -272,6 +272,7 @@ class VOIP{
             cseq: this.registration_cseq,
             branchId: SIP.Builder.generateBranch(),
             from_tag: SIP.Builder.generateTag(),
+            remote_port:this.transport.port,
         }
 
 
@@ -324,7 +325,7 @@ class VOIP{
         sendRegister();
     }
 
-    call2(props){
+    call(props){
         var cseq = 1;
         var try_count = 0;
         var sdp = `v=0
@@ -348,6 +349,7 @@ class VOIP{
             body: sdp,
             password: this.register_password,
             requestUri: `sip:${props.to}@${props.ip}:${props.port}`,
+            remote_port: this.transport.port,
         };
 
         const sendInvite = (challenge_headers, proxy_auth = false) => {
@@ -383,11 +385,17 @@ class VOIP{
                     return;
                 }else if (response.isResponse == false && response.method == 'BYE') {
                     console.log('BYE Received');
-                    this.send(this.response({   
+                    let res = this.response({   
                         statusCode: 200,
                         statusText: 'OK',
-                        headers: SIP.Parser.ParseHeaders(res.headers)
-                    }))  
+                        headers: SIP.Parser.ParseHeaders(response.headers)
+                    })
+                    if(this.type == 'server'){
+                        this.server_send(res, h.ip, h.port)
+                    }else{
+                        this.send(res)  
+                    }
+
                     return;
                 }else if(response.isResponse == false && response.method == 'INFO'){
                     console.log('INFO Received');
@@ -418,96 +426,6 @@ class VOIP{
         
         sendInvite();
 
-    }
-
-    call(extension, ip, port, client_callback){
-        var cseq = 1;
-        var try_count = 0;
-        let b = SIP.Builder.generateBranch();
-        var sdp = `v=0
-        o=- 123456789 123456789 IN IP4 ${utils.getLocalIpAddress()}
-        s=node.js-sip Call
-        c=IN IP4 ${utils.getLocalIpAddress()}
-        t=0 0
-        m=audio 5005 RTP/AVP 8
-        a=rtpmap:8 PCMA/8000
-        a=fmtp:8 0-15`.replace(/^[ \t]+/gm, '');
-        
-        let h = {
-            extension: extension,
-            ip: ip,
-            port: this.port,
-            register_ip: this.register_ip || utils.getLocalIpAddress(),
-            register_port: this.register_port || 5060,
-            username: this.username,
-            callId: SIP.Builder.generateBranch(),
-            cseq: cseq,
-            branchId: SIP.Builder.generateBranch(),
-            from_tag: SIP.Builder.generateTag(),
-            body: sdp,
-            password: this.register_password,
-            requestUri: `sip:${extension}@${ip}:${port}`,
-        };
-        
-        const sendInvite = (challenge_headers, proxy_auth = false) => {
-            try_count++;
-            if(try_count > this.max_retries){
-                console.log('Max retries reached');
-                client_callback({type:'CALL_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
-                return;
-            }
-            this.send(SIP.Builder.SIPMessageObject('INVITE', h, challenge_headers, proxy_auth), (response) => {
-                console.log(response)
-                if(response.statusCode == 400){
-                    console.log('400 Bad Request');
-                    return;
-                }else if (response.statusCode == 401) {
-                    let challenge_data = SIP.Parser.ParseHeaders(response.headers)['WWW-Authenticate'];
-                    sendInvite(challenge_data, false);
-                }else if(response.statusCode == 407){
-                    let challenge_data = SIP.Parser.ParseHeaders(response.headers)['Proxy-Authenticate'];
-                    sendInvite(challenge_data, true);
-                }else if (response.statusCode == 100) {
-                    console.log('100 Trying');
-                    return;
-                }else if (response.statusCode == 403) {
-                    console.log('403 Forbidden');
-                    //delete this.message_stack[tag];
-                    client_callback({type:'CALL_REJECTED', message:response});
-                    return;
-                }else if (response.statusCode == 183) {
-                    console.log('183 Session Progress');
-                    return
-                }else if (response.statusCode == 200) {
-                    console.log('200 OK');
-                    console.log('ack')
-                    this.ack(response);
-                    client_callback({type:'CALL_CONNECTED', message:response, sdp: response.body});
-                    return;
-                }else if (response.isResponse == false && response.method == 'BYE') {
-                    console.log('BYE Received');
-                    this.send(this.response({   
-                        statusCode: 200,
-                        statusText: 'OK',
-                        headers: SIP.Parser.ParseHeaders(res.headers)
-                    }))  
-                    return;
-                }else if(response.isResponse == false && response.method == 'INFO'){
-                    console.log('INFO Received');
-                    console.log(response.body)
-                    this.send(this.response({   
-                        statusCode: 200,
-                        statusText: 'OK',
-                        headers: SIP.Parser.ParseHeaders(res.headers)
-                    }))  
-                    return;
-                }else {
-                    console.error('Unexpected status code:', response.statusCode);
-                }
-            });
-        };
-        
-        sendInvite();
     }
 
     accept(message, sdp, client_callback){

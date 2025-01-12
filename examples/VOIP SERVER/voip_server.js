@@ -29,15 +29,13 @@ var server = new VOIP({
     type:'server',
     transport:{
         type: 'UDP',
-        ip: utils.getLocalIpAddress(),
         port: 5060,
     }
 },
 (d) => {
-    if(d.message !== undefined){
+    if(d.type == 'UAS_READY'){
+    }else if(d.message !== undefined){
         let parsed_headers = SIP.Parser.ParseHeaders(d.message.headers);
-        console.log('parsed_headers')
-        console.log(parsed_headers)
         if(d.type == 'REGISTER'){
             server.uas_handle_registration(d.message, USERS, (response) => {
                 console.log('response')
@@ -52,3 +50,17 @@ var server = new VOIP({
         }
     }
 })
+
+server.TrunkManager.addTrunk({
+    name:'trunk1',
+    type:'SIP',
+    username:'1001',
+    password:'rootPassword',
+    ip:'192.168.1.2',
+    port:5060,
+    callId:'1234567890'
+})
+
+setTimeout(() => {
+    server.TrunkManager.trunks['trunk1'].register();
+}, 1000)
