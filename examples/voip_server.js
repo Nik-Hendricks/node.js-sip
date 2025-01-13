@@ -1,7 +1,7 @@
 //Nik Hendricks 10/13/23
-const SIP = require('../../SIP')
-const VOIP = require('../../')
-const utils = require('../../utils')
+const SIP = require('../SIP')
+const VOIP = require('../')
+const utils = require('../utils')
 
 const USERS = {
     '1000':{
@@ -70,17 +70,4 @@ server.Router.addRoute({
 
 setTimeout(() => {
     server.TrunkManager.trunks['trunk1'].register();
-    //setTimeout(() => {
-    //    server.TrunkManager.trunks['trunk1'].uac.call({
-    //        to:'1000',
-    //        ip:utils.getLocalIpAddress(),
-    //        port:5060,
-    //        callId:'1234567890',
-    //        username:'1001',
-    //        client_callback:(m) => {
-    //            console.log(`client_callback`)
-    //            console.log(m)
-    //        }
-    //    })
-    //})
 }, 1000)
