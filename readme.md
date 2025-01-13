@@ -39,7 +39,7 @@ const voipClient = new VOIP({
     if (response.type === 'REGISTERED') {
         console.log('Successfully registered with the SIP server.');
         v.call({
-            to:'14173620296',
+            to:'14444444444',
             ip:'192.168.1.12',
             port:'5060',
             callId:'1234567890',
