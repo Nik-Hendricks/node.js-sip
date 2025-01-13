@@ -24,13 +24,11 @@ Here's a quick example to demonstrate how to set up a client and make a SIP call
 
 ```javascript
 const VOIP = require('node.js-sip');
-const utils = require('./utils');
 
 const voipClient = new VOIP({
     type: 'client',
     transport: {
         type: 'UDP',
-        ip: utils.getLocalIpAddress(),
         port: 5060,
     },
     username: '1000',
@@ -40,12 +38,17 @@ const voipClient = new VOIP({
 }, (response) => {
     if (response.type === 'REGISTERED') {
         console.log('Successfully registered with the SIP server.');
-
-        voipClient.call('1001', '192.168.1.3', 5060, (callResponse) => {
-            if (callResponse.type === 'CALL_CONNECTED') {
-                console.log('Call connected!');
+        v.call({
+            to:'14173620296',
+            ip:'192.168.1.12',
+            port:'5060',
+            callId:'1234567890',
+            username:'1001',
+            client_callback:(m) => {
+                console.log(`client_callback`)
+                console.log(m)
             }
-        });
+        })
     }
 });
 ```
@@ -53,24 +56,78 @@ const voipClient = new VOIP({
 ### Setting Up a SIP Server
 
 ```javascript
-const VOIP = require('node.js-sip');
+//Nik Hendricks 10/13/23
+const SIP = require('../SIP')
+const VOIP = require('../')
 
-const voipServer = new VOIP({
-    type: 'server',
-    transport: {
+const USERS = {
+    '1000':{
+        password:'rootPassword',
+        name:'test testerson',
+        ip:undefined,
+        port:undefined,
+        registered:false,
+        call_id:undefined,  
+        extension: '1000'
+    },
+    '1001':{
+        password:'rootPassword',
+        name:'Bill Billerson',
+        ip:undefined,
+        port:undefined,
+        registered:false,
+        call_id:undefined,  
+        extension: '1001'
+    }
+}
+
+
+var server = new VOIP({
+    type:'server',
+    transport:{
         type: 'UDP',
-        ip: '0.0.0.0', // Listen on all available IPs
         port: 5060,
     },
-}, (response) => {
-    console.log(`Server event: ${response.type}`);
-});
+},
+(d) => {
+    if(d.type == 'UAS_READY'){
+    }else if(d.message !== undefined){
+        let parsed_headers = SIP.Parser.ParseHeaders(d.message.headers);
+        if(d.type == 'REGISTER'){
+            server.uas_handle_registration(d.message, USERS, (response) => {
+                console.log('response')
+                console.log(response)
+            })
+        }else if(d.type == 'INVITE'){
+            server.uas_handle_invite(d.message, USERS, (response) => {
+                console.log('response')
+                console.log(response)
+            })
+            
+        }
+    }
+})
 
-// Handle incoming calls
-voipServer.on('INVITE', (message) => {
-    voipServer.accept(message);
-    console.log('Incoming call accepted.');
-});
+server.TrunkManager.addTrunk({
+    name:'trunk1',
+    type:'SIP',
+    username:'1001',
+    password:'rootPassword',
+    ip:'192.168.1.2',
+    port:5060,
+    callId:'1234567890'
+})
+
+server.Router.addRoute({
+    name: 'Main Trunk Route',
+    type: 'trunk',
+    match: '^[0-9]{11}$',
+    endpoint: 'trunk:trunk1', //will decide if i want the prefix or to use the type property
+})
+
+setTimeout(() => {
+    server.TrunkManager.trunks['trunk1'].register();
+}, 1000)
 ```
 
 ## API Reference
@@ -92,12 +149,15 @@ voipServer.on('INVITE', (message) => {
 
 ### Methods
 
-#### `call(extension, ip, port, callback)`
-Initiates a call to the specified extension.
-- `extension`: The SIP extension to call.
-- `ip`: The IP address of the callee.
-- `port`: The port of the callee (default: `5060`).
-- `callback(response)`: Callback for call events.
+#### `call(props)`
+Initiates a SIP call.
+- `props`: Call properties.
+  - `to`: Destination phone number.
+  - `ip`: Destination IP address.
+  - `port`: Destination port.
+  - `callId`: Call ID.
+  - `username`: SIP username.
+  - `client_callback`: Callback for client events.
 
 #### `accept(message)`
 Accepts an incoming SIP INVITE message.

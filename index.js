@@ -8,6 +8,7 @@ class VOIP{
         props = props || {};
         this.SDPParser = SDPParser;
         this.transport = SIP.Transport.new(props);
+        this.utils = utils;
         this.message_stack = {};
         this.type = props.type;
         if(props.type == 'client'){
@@ -356,7 +357,7 @@ class VOIP{
 
         let h = {
             to: props.to,
-            ip: props.ip,
+            ip: props.ip || this.register_ip,
             port: props.port,
             username: props.username,
             callId: SIP.Builder.generateBranch(),

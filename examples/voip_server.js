@@ -1,7 +1,6 @@
 //Nik Hendricks 10/13/23
 const SIP = require('../SIP')
 const VOIP = require('../')
-const utils = require('../utils')
 
 const USERS = {
     '1000':{

@@ -1,5 +1,4 @@
 const VOIP = require('../index.js')
-const utils = require('../utils')
 
 var v = new VOIP({
     type:'client',
