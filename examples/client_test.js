@@ -7,9 +7,9 @@ var v = new VOIP({
         type: 'UDP',
         port: 5060,
     },
-    username:'17778021863101',
-    register_password:'@5S4i8702a43',
-    register_ip:'sip.callcentric.com',
+    username:'1001',
+    register_password:'rootPassword43',
+    register_ip:'192.168.1.12',
     register_port:5060,
     callId:'1234567890'
 }, (d) => {
@@ -18,7 +18,7 @@ var v = new VOIP({
         console.log(`REGISTERED`)
         v.call({
             to:'14173620296',
-            ip:'sip.callcentric.com',
+            ip:'192.168.1.12',
             port:'5060',
             callId:'1234567890',
             username:'1001',

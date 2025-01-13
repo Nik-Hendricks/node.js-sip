@@ -19,6 +19,7 @@ class VOIP{
         
     UAS(props, callback){
         this.TrunkManager = new SIP.TrunkManager(VOIP); //need to pass the VOIP class through so that new UACs can be created as the Trunks.
+        this.Router = props.Router || new SIP.Router();
         callback({type:'UAS_READY'})
         this.sip_event_listener(callback, 'server');
     }
@@ -184,6 +185,12 @@ class VOIP{
                             headers: parsed_headers,
                             expires: 3600
                         }), client_ip, client_port)
+                        this.Router.addRoute({
+                            name: `Extension ${client_username}`,
+                            type: 'extension',
+                            match: `^${client_username}$`,
+                            endpoint: `extension:${client_username}`
+                        })
                     }else{
                         this.server_send(this.response({
                             statusCode: 401,
@@ -225,21 +232,31 @@ class VOIP{
                         //    console.log(m)
                         //});
 
-                        this.call({username:auth.username, to: callee, ip: users[callee].ip, port: users[callee].port, client_callback: (d) => {
-                            console.log('call callback')
-                            console.log(d)
-                        }})
 
-                        //var response = this.response({
-                        //    statusCode: 200,
-                        //    statusText: 'OK',
-                        //    headers: parsed_headers,
-                        //    expires: 3600
-                        //})
 
-                        //console.log(`INVITE ${auth.username}`)
-                        //console.log(users)
+                        console.log('ROUTE')
+                        console.log(this.Router.route(d))
+                        
+                        var endpoint = this.Router.route(d);
 
+                        if(endpoint.indexOf('trunk') > -1){
+                            console.log('TRUNK')
+                            let ep = endpoint.split(':')[1];
+                            let final_ep = this.TrunkManager.trunks[ep];
+                            console.log(final_ep)
+                            final_ep.uac.call({username:auth.username, to: callee, ip: final_ep.uac.register_ip, port: final_ep.uac.register_port, client_callback: (d) => {
+                                console.log('call callback')
+                                console.log(d)
+                            }})
+                        }else if(endpoint.indexOf('extension') > -1){
+                            console.log('EXTENSION')
+                            let ep = endpoint.split(':')[1];
+                            let final_ep = users[ep];
+                            this.call({username:auth.username, to: callee, ip: final_ep.ip, port: final_ep.port, client_callback: (d) => {
+                                console.log('call callback')
+                                console.log(d)
+                            }})
+                        }
                     }else{
                         this.server_send(this.response({
                             statusCode: 401,
@@ -425,7 +442,6 @@ class VOIP{
         };
         
         sendInvite();
-
     }
 
     accept(message, sdp, client_callback){

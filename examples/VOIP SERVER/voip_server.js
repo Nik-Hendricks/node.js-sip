@@ -30,7 +30,7 @@ var server = new VOIP({
     transport:{
         type: 'UDP',
         port: 5060,
-    }
+    },
 },
 (d) => {
     if(d.type == 'UAS_READY'){
@@ -61,6 +61,26 @@ server.TrunkManager.addTrunk({
     callId:'1234567890'
 })
 
+server.Router.addRoute({
+    name: 'Main Trunk Route',
+    type: 'trunk',
+    match: '^[0-9]{11}$',
+    endpoint: 'trunk:trunk1',
+})
+
 setTimeout(() => {
     server.TrunkManager.trunks['trunk1'].register();
+    //setTimeout(() => {
+    //    server.TrunkManager.trunks['trunk1'].uac.call({
+    //        to:'1000',
+    //        ip:utils.getLocalIpAddress(),
+    //        port:5060,
+    //        callId:'1234567890',
+    //        username:'1001',
+    //        client_callback:(m) => {
+    //            console.log(`client_callback`)
+    //            console.log(m)
+    //        }
+    //    })
+    //})
 }, 1000)

@@ -50,11 +50,14 @@ class TrunkManager {
             console.log(`client_test.js > d.type: ${d.type}`)
             if(d.type == 'REGISTERED'){
                 console.log(`REGISTERED`)
+                
             }else if(d.type == 'REGISTER_FAILED'){
                 console.log(`REGISTER_FAILED`)
                 console.log(d.message)
             }
         })
+
+        props.uac = uac;
     }
         
 

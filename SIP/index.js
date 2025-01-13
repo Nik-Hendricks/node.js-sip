@@ -5,9 +5,8 @@ const SIP = {
     Transport: require('./Transport.js'),
     Parser: require('./Parser.js').Parser,
     HeaderParser: require('./Parser.js').HeaderParser,
-    Dialog: require('./Dialog.js'),
-    Transaction: require('./Transaction.js'),
     TrunkManager: require('./TrunkManager.js'),
+    Router: require('./Router.js')
 }
 
 //create sip message

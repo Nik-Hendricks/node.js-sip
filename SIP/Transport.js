@@ -10,19 +10,20 @@ const Transports = {
     new: (props) => {
         Transports[props.transport.type](props)
         Transports.port = props.transport.port;
+        Transports.ip = utils.getLocalIpAddress();
         return Transports;
     },
 
     UDP: (props) => {
         Transports.type = 'UDP';
         Transports.socket = dgram.createSocket('udp4');
-        Transports.socket.bind(props.transport.port, utils.getLocalIpAddress());
+        Transports.socket.bind(props.transport.port, Transports.ip);
     },
 
     TCP: (props) => {
         Transports.type = 'TCP';
         Transports.socket = dgram.createSocket('tcp4');
-        Transports.socket.bind(props.transport.port, utils.getLocalIpAddress());
+        Transports.socket.bind(props.transport.port, Transports.ip);
     },
 
 
