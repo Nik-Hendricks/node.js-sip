@@ -16,7 +16,7 @@ var v = new VOIP({
     if(d.type == 'REGISTERED'){
         console.log(`REGISTERED`)
         v.call({
-            to:'14444444444',
+            to:'1000',
             ip:'192.168.1.12',
             port:'5060',
             callId:'1234567890',

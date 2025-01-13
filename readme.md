@@ -173,31 +173,13 @@ Sends a SIP MESSAGE to the specified extension.
 - `extension`: The SIP extension to message.
 - `body`: The message body.
 
-## Examples
+## TODO / Known Issues
+- Further orginization of the codebase is needed.
+- Finish RTP implementation.
+- Finish SDPParser implementation.
+- When making a call from a UAS in a b2bua configuration bye messages recived from the UAS Trunk UAC are not being associated with the originating messages.
 
-### Sending a SIP MESSAGE
 
-```javascript
-voipClient.message('1001', 'Hello, this is a test message!');
-```
-
-### Accepting an Incoming Call
-
-```javascript
-voipServer.on('INVITE', (message) => {
-    voipServer.accept(message);
-    console.log('Incoming call accepted.');
-});
-```
-
-### Terminating a Call
-
-```javascript
-voipServer.on('BYE', (message) => {
-    voipServer.bye(message);
-    console.log('Call terminated.');
-});
-```
 
 ## License
 
