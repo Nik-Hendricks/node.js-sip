@@ -1,5 +1,5 @@
 //Nik Hendricks 10/13/23
-
+//Nik Hendricks 1/15/25
 const SIP = {
     Builder: require('./Builder.js'),
     Transport: require('./Transport.js'),
@@ -7,11 +7,6 @@ const SIP = {
     HeaderParser: require('./Parser.js').HeaderParser,
     TrunkManager: require('./TrunkManager.js'),
     Router: require('./Router.js')
-}
-
-//create sip message
-function create_message(type, headers){
-    
 }
 
 module.exports = SIP;

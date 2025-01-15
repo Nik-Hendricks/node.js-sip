@@ -227,19 +227,7 @@ class VOIP{
                 if(auth !== undefined){
                     if(users[auth.username] !== undefined){
                         let callee = parsed_headers.To.contact.username;
-                        console.log(`INVITE ${callee}`)
-                        //this.call(callee, users[auth.username].ip, users[auth.username].port, (m) => {
-                        //    console.log('call callback')
-                        //    console.log(m)
-                        //});
-
-
-
-                        console.log('ROUTE')
-                        console.log(this.Router.route(d))
-                        
                         var endpoint = this.Router.route(d);
-
                         if(endpoint.indexOf('trunk') > -1){
                             console.log('TRUNK')
                             let ep = endpoint.split(':')[1];

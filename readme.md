@@ -178,6 +178,7 @@ Sends a SIP MESSAGE to the specified extension.
 - Finish RTP implementation.
 - Finish SDPParser implementation.
 - When making a call from a UAS in a b2bua configuration bye messages recived from the UAS Trunk UAC are not being associated with the originating messages.
+- UAS UAC Registrations does not actually check if the password is correct.
 
 
 
