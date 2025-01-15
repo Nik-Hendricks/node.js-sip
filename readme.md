@@ -180,7 +180,15 @@ Sends a SIP MESSAGE to the specified extension.
 - When making a call from a UAS in a b2bua configuration bye messages recived from the UAS Trunk UAC are not being associated with the originating messages.
 - UAS UAC Registrations does not actually check if the password is correct.
 
+## Star History
 
+<a href="https://star-history.com/#Nik-Hendricks/node.js-sip&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Nik-Hendricks/node.js-sip&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Nik-Hendricks/node.js-sip&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Nik-Hendricks/node.js-sip&type=Date" />
+ </picture>
+</a>
 
 ## License
 
