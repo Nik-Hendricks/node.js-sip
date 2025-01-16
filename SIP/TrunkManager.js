@@ -1,6 +1,3 @@
-const Transports = require('./Transport.js')
-
-console.log(Transports)
 class TrunkManager {
     constructor(VOIP) {
         this.trunks = {};

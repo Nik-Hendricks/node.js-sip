@@ -2,26 +2,26 @@
 const SIP = require('../SIP')
 const VOIP = require('../')
 
-const USERS = {
-    '1000':{
-        password:'rootPassword',
-        name:'test testerson',
-        ip:undefined,
-        port:undefined,
-        registered:false,
-        call_id:undefined,  
-        extension: '1000'
-    },
-    '1001':{
-        password:'rootPassword',
-        name:'Bill Billerson',
-        ip:undefined,
-        port:undefined,
-        registered:false,
-        call_id:undefined,  
-        extension: '1001'
-    }
-}
+//const USERS = {
+//    '1000':{
+//        password:'rootPassword',
+//        name:'test testerson',
+//        ip:undefined,
+//        port:undefined,
+//        registered:false,
+//        call_id:undefined,  
+//        extension: '1000'
+//    },
+//    '1001':{
+//        password:'rootPassword',
+//        name:'Bill Billerson',
+//        ip:undefined,
+//        port:undefined,
+//        registered:false,
+//        call_id:undefined,  
+//        extension: '1001'
+//    }
+//}
 
 
 var server = new VOIP({
@@ -36,12 +36,12 @@ var server = new VOIP({
     }else if(d.message !== undefined){
         let parsed_headers = SIP.Parser.ParseHeaders(d.message.headers);
         if(d.type == 'REGISTER'){
-            server.uas_handle_registration(d.message, USERS, (response) => {
+            server.uas_handle_registration(d.message, (response) => {
                 console.log('response')
                 console.log(response)
             })
         }else if(d.type == 'INVITE'){
-            server.uas_handle_invite(d.message, USERS, (response) => {
+            server.uas_handle_invite(d.message, (response) => {
                 console.log('response')
                 console.log(response)
             })
@@ -49,6 +49,17 @@ var server = new VOIP({
         }
     }
 })
+
+server.UserManager.addUser({
+    name:'test testerson',
+    extension:'1000',
+    ip:undefined,
+    port:undefined,
+    username:'1000',
+    password:'rootPassword',
+})
+
+console.log(server.UserManager.users)
 
 server.TrunkManager.addTrunk({
     name:'trunk1',

@@ -20,6 +20,7 @@ class VOIP{
         
     UAS(props, callback){
         this.TrunkManager = new SIP.TrunkManager(VOIP); //need to pass the VOIP class through so that new UACs can be created as the Trunks.
+        this.UserManager = new SIP.UserManager();
         this.Router = props.Router || new SIP.Router();
         callback({type:'UAS_READY'})
         this.sip_event_listener(callback, 'server');
@@ -166,9 +167,9 @@ class VOIP{
         let client_port = parsed_headers.Contact.contact.port;
         console.log(parsed_headers)
 
-        if(users[client_username] !== undefined){
-            users[client_username].ip = client_ip;
-            users[client_username].port = client_port;
+        if(this.UserManager.users[client_username] !== undefined){
+            this.UserManager.users[client_username].ip = client_ip;
+            this.UserManager.users[client_username].port = client_port;
             this.server_send(this.response({
                 statusCode: 401,
                 statusText: 'Unauthorized',
@@ -178,8 +179,8 @@ class VOIP{
                 parsed_headers = SIP.Parser.ParseHeaders(d.headers);
                 if(d.method == 'REGISTER'){
                     if(parsed_headers.Authorization !== undefined){
-                        users[client_username].registered = true;
-                        console.log(users)
+                        this.UserManager.users[client_username].registered = true;
+                        console.log(this.UserManager.users)
                         this.server_send(this.response({
                             statusCode: 200,
                             statusText: 'OK',
@@ -225,7 +226,7 @@ class VOIP{
             if(d.isResponse == false && d.method == 'INVITE'){
                 let auth = parsed_headers.Authorization;
                 if(auth !== undefined){
-                    if(users[auth.username] !== undefined){
+                    if(this.UserManager.users[auth.username] !== undefined){
                         let callee = parsed_headers.To.contact.username;
                         var endpoint = this.Router.route(d);
                         if(endpoint.indexOf('trunk') > -1){
@@ -240,7 +241,7 @@ class VOIP{
                         }else if(endpoint.indexOf('extension') > -1){
                             console.log('EXTENSION')
                             let ep = endpoint.split(':')[1];
-                            let final_ep = users[ep];
+                            let final_ep = this.UserManager.users[ep];
                             this.call({username:auth.username, to: callee, ip: final_ep.ip, port: final_ep.port, client_callback: (d) => {
                                 console.log('call callback')
                                 console.log(d)

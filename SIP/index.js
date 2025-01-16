@@ -6,6 +6,7 @@ const SIP = {
     Parser: require('./Parser.js').Parser,
     HeaderParser: require('./Parser.js').HeaderParser,
     TrunkManager: require('./TrunkManager.js'),
+    UserManager: require('./UserManager.js'),
     Router: require('./Router.js')
 }
 
