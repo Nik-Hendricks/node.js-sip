@@ -4,16 +4,15 @@ class UserManager {
     }
 
     addUser(props) {
-        this.users[props.username] = this.User(props);
+        this.users[props.extension] = this.User(props);
     }
 
-    removeUser(username) {
-        delete this.users[name];
+    removeUser(extension) {
+        delete this.users[extension];
     }
 
     User(props){
         let ret = {
-            name: props.name,
             extension: props.extension,
             ip: props.ip,
             port: props.port,
