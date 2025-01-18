@@ -75,6 +75,8 @@ class VOIP{
                 var c = null;            
                 for(var i = mg.length - 1; i >= 0; i--){
                     if(mg[i].callback !== undefined){
+                        console.log('callback found')
+                        console.log(mg[i])
                         c = mg[i].callback;
                         break;
                     }
@@ -94,7 +96,10 @@ class VOIP{
             this.message_stack[branch][tag].push({message:res, sent: false})
 
             let cb = check_for_callbacks(tag, branch);
+            console.log('cb > ', cb)
+
             if(cb == undefined){
+                console.log('no callback')
                 if(user_agent_type == 'client'){
                     this.uac_responses(msg, client_callback)
                 }else if(user_agent_type == 'server'){
@@ -102,7 +107,6 @@ class VOIP{
                 }
                 return;
             }else{
-                console.log('the callback was not undefined and this is the bug right here')
                 cb(res);
             }
         })
@@ -120,6 +124,8 @@ class VOIP{
             this.message_stack[branch][tag] = [];
         }
         this.message_stack[branch][tag].push({message, callback: msg_callback, sent: true})
+        console.log('server_send > message_stack')
+        console.log(this.message_stack)
     }
 
     send(message, msg_callback){
@@ -134,6 +140,8 @@ class VOIP{
             this.message_stack[branch][tag] = [];
         }
         this.message_stack[branch][tag].push({message, callback: msg_callback, sent: true})
+        console.log('send > message_stack')
+        console.log(this.message_stack)
     }
 
     uac_responses(msg, client_callback){
@@ -169,10 +177,6 @@ class VOIP{
                 statusText: 'Unauthorized',
                 headers: SIP.Parser.ParseHeaders(res.headers)
             }))
-        }else if(type == 200){
-            console.log('uac_responses > 200')
-            //send ACK
-            this.ack(res);
         }
     }
 
@@ -371,39 +375,6 @@ class VOIP{
         sendRegister();
     }
 
-
-/*
-Steps for Internal Calls in a B2BUA
-Here's the sequence for an internal call:
-
-Caller Sends INVITE:
-
-Parse the INVITE and determine the callee (e.g., through a Router).
-Use the same branch as in the caller's INVITE to send provisional responses.
-Send 100 Trying and 180 Ringing to Caller:
-
-Use the same branch from the caller's INVITE.
-Generate a To tag when sending the 180 Ringing.
-Send INVITE to Callee:
-
-Generate a new branch for this transaction.
-Add your From tag to represent the B2BUA side of the dialog.
-Start a new transaction to handle responses from the callee.
-Handle Provisional and Final Responses:
-
-Relay provisional responses (e.g., 183 Session Progress, 180 Ringing) from the callee back to the caller, maintaining appropriate tags and branches for each side.
-For 200 OK responses:
-Parse and relay the SDP between caller and callee.
-ACK and BYE Handling:
-
-Send an ACK to the callee for their 200 OK.
-Forward BYE from either side, ensuring you generate proper Via branches and maintain dialog consistency.
-*/
-
-
-
-
-
     uas_call(props){
         let cseq = 1;
         let parsed_headers = SIP.Parser.ParseHeaders(props.message.headers);
@@ -412,7 +383,26 @@ Forward BYE from either side, ensuring you generate proper Via branches and main
 
         console.log(props.endpoint)
 
-        let h = {
+
+        parsed_headers.To.tag = SIP.Builder.generateTag();
+
+
+        let trying = this.response({
+            statusCode: 100,
+            statusText: 'Trying',
+            headers: parsed_headers
+        })
+
+        let ringing = this.response({
+            statusCode: 180,
+            statusText: 'Ringing',
+            headers: parsed_headers
+        })
+
+        this.server_send(trying, parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
+        this.server_send(ringing, parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
+
+        let invite_headers = {
             to: props.endpoint.extension,
             ip: props.endpoint.ip,
             port: props.endpoint.port,
@@ -427,15 +417,38 @@ Forward BYE from either side, ensuring you generate proper Via branches and main
             remote_port: this.transport.port,
         };
 
-        let invite_msg = SIP.Builder.SIPMessageObject('INVITE', h);
+        let invite_msg = SIP.Builder.SIPMessageObject('INVITE', invite_headers);
+        this.server_send(invite_msg, props.endpoint.ip, props.endpoint.port, (d) => {
+            console.log('PLEASE WORK PLEEEAAASSEEE')
+            console.log(d)
+        })
 
-        this.server_send(invite_msg, h.ip, h.port, (response) => {
-            console.log('uas_call > server_send > callback')
-            console.log(response)
-        });
+        //send INVITE to Callee
+        //let invite_headers = {
+        //    to: props.endpoint.extension,
 
 
-
+        //let h = {
+        //    to: props.endpoint.extension,
+        //    ip: props.endpoint.ip,
+        //    port: props.endpoint.port,
+        //    username: parsed_headers.From.contact.username,
+        //    callId: SIP.Builder.generateBranch(),
+        //    cseq: cseq,
+        //    branchId: SIP.Builder.generateBranch(),
+        //    from_tag: SIP.Builder.generateTag(),
+        //    body: props.body,
+        //    password: this.register_password,
+        //    requestUri: `sip:${props.endpoint.extension}@${props.endpoint.ip}:${props.endpoint.port}`,
+        //    remote_port: this.transport.port,
+        //};
+//
+        //let invite_msg = SIP.Builder.SIPMessageObject('INVITE', h);
+        //this.server_send(invite_msg, props.endpoint.ip, props.endpoint.port, (d) => {
+        //    console.log('uas_call > server_send > callback')
+        //    console.log(d)
+        //    console.log('uas_call > server_send > callback')
+        //})
 
     }
 
@@ -546,6 +559,7 @@ Forward BYE from either side, ensuring you generate proper Via branches and main
     }
 
     accept(message, sdp, client_callback){
+        console.log('accept')
         var cseq = 1;
         let our_sdp = `v=0
                         o=- 123456789 123456789 IN IP4 192.168.1.110
@@ -665,7 +679,7 @@ Forward BYE from either side, ensuring you generate proper Via branches and main
             requestUri: `sip:${headers.To.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}`,
             headers: {
                 'Via': `SIP/2.0/UDP ${headers.Via.uri.ip}:${headers.Via.uri.port || 5060};branch=${headers.Via.branch}`,
-                'To': `<sip:${headers.To.contact.username}>`,
+                'To': `<sip:${headers.To.contact.username}>@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}`,
                 'From': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>;tag=${headers.From.tag}`,
                 'Call-ID': headers['Call-ID'],
                 'CSeq': `${headers.CSeq.count} ${headers.CSeq.method}`,
