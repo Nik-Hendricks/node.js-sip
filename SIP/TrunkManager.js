@@ -13,57 +13,35 @@ class TrunkManager {
     }
 
     Trunk(props){
-        let ret = {
+        return {
             name: props.name,
             type: props.type,
             ip: props.ip,
             port: props.port,
             username: props.username,
             password: props.password,
-            uac: null,
-            register: (e) => {
-                this.register_trunk(ret);
-            }
-        }
-
-        return ret;
-    }
-
-    register_trunk(props){
-        let uac = new this.VOIP({
-            type:'client',
-            transport:{
-                type: 'UDP',
-                //random port < 0 > 65535
-                port: Math.floor(Math.random() * 65535) + 1,
-            },
-            username: props.username,
-            register_password: props.password,
-            register_ip: props.ip,
-            register_port: props.port,
-            callId: Math.floor(Math.random() * 100000000),
-
-        }, (d) => {
-            console.log(`client_test.js > d.type: ${d.type}`)
-            if(d.type == 'REGISTERED'){
-                console.log(`REGISTERED`)
-                
-            }else if(d.type == 'REGISTER_FAILED'){
-                console.log(`REGISTER_FAILED`)
-                console.log(d.message)
-            }
-        })
-
-        props.uac = uac;
-    }
-        
-
-    registerAll(){
-        for (const trunk in this.trunks) {
-            this.trunks[trunk].register();
+            uac: new this.VOIP({
+                type:'client',
+                transport:{
+                    type: 'udp4',
+                    port: Math.floor(Math.random() * 65535) + 1,
+                },
+                username: props.username,
+                register_password: props.password,
+                register_ip: props.ip,
+                register_port: props.port,
+                callId: Math.floor(Math.random() * 100000000),
+    
+            }, (d) => {
+                if(d.type == 'REGISTERED'){
+                    console.log(`Trunk ${props.name} Registered`)
+                }else if(d.type == 'REGISTER_FAILED'){
+                    console.log(`REGISTER_FAILED`)
+                    console.log(d.message)
+                }
+            })
         }
     }
-
 }
 
 module.exports = TrunkManager;

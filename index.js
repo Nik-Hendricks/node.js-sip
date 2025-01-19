@@ -6,12 +6,16 @@ const SDPParser = require('./SDP')
 class VOIP{
     constructor(props, callback){
         props = props || {};
+        this.transparent = props.transparent || false; //enableing transparent mode will cause the deafault repsonses to be bypassed and the user will have to handle the responses themselves.
+        this.unique_debug_id = props.unique_debug_id || `VOIP_${(this.type == 'client') ? 'UAC' : 'UAS'}__${Math.floor(Math.random() * 1000000)}`;
         this.SDPParser = SDPParser;
-        this.transport = SIP.Transport.new(props);
+        this.transport = (props.existing_transport !== undefined) ? props.existing_transport : new SIP.Transport({
+            type: props.transport.type || 'udp4',
+            port: props.transport.port || Math.floor(Math.random() * 65535) + 1,
+            ip: utils.getLocalIpAddress(),
+        });
         this.utils = utils;
         this.message_stack = {};
-        this.transactions = {};
-        this.dialogs = {};
         this.type = props.type;
         if(props.type == 'client'){
             this.UAC(props, callback);
@@ -24,25 +28,35 @@ class VOIP{
         this.TrunkManager = new SIP.TrunkManager(VOIP); //need to pass the VOIP class through so that new UACs can be created as the Trunks.
         this.UserManager = new SIP.UserManager();
         this.Router = props.Router || new SIP.Router();
-        //this.internal_uac = new VOIP({type:'client', transport:{port: Math.floor(Math.random() * 65535) + 1, type:'UDP'}}, (d) => {
-        //    console.log('internal_uac')
-        //    console.log(d)
-        //});
+        this.internal_uac = new VOIP({
+            type:'client',
+            server_uac: true,
+            transport:{
+                type: 'udp4',
+                port: Math.floor(Math.random() * 65535) + 1,
+                ip: utils.getLocalIpAddress(),
+            },
+            transparent: true,
+        }, (d) => {
+            console.log('internal_uac callback')
+            console.log(d)
+        })
+        
         callback({type:'UAS_READY'})
         this.sip_event_listener(callback, 'server');
     }
     
     UAC(props, client_callback){
+        this.server_uac = props.server_uac || false;
         this.username = props.username;
         this.register_ip = props.register_ip;
-        this.register_port = props.register_port;
+        this.register_port = props.register_port || 5060;
         this.register_password = props.register_password;
-        this.ip = props.transport.ip;
-        this.port = props.transport.port;
+        this.ip = this.transport.ip;
+        this.port = this.transport.port;
         this.max_retries = 10;
         this.registration_interval = 10;
         this.registration_cseq = 1;
-        this.internal = props.internal || false;
 
         this.register(props, (d) => {
             client_callback(d);
@@ -62,10 +76,6 @@ class VOIP{
             }
             var tag = SIP.Parser.ParseHeaders(res.headers).From.tag;
             var branch = SIP.Parser.ParseHeaders(res.headers).Via.branch;
-            console.log('tag > ', tag)
-            console.log('branch > ', branch)    
-            console.log('method > ', res.method || res.statusCode)
-
 
             let check_for_callbacks = (tag, branch) => {
                 let mg = [].concat.apply([], Object.entries(this.message_stack[branch]).map((d => d[1]))).filter((d) => d.sent == true)
@@ -76,7 +86,6 @@ class VOIP{
                 for(var i = mg.length - 1; i >= 0; i--){
                     if(mg[i].callback !== undefined){
                         console.log('callback found')
-                        console.log(mg[i])
                         c = mg[i].callback;
                         break;
                     }
@@ -101,11 +110,18 @@ class VOIP{
             if(cb == undefined){
                 console.log('no callback')
                 if(user_agent_type == 'client'){
-                    this.uac_responses(msg, client_callback)
+                    if(this.transparent == true){
+                        client_callback({type:res.method || res.statusCode, message:res})
+                    }else{
+                        this.uac_responses(msg, client_callback)
+                    }
                 }else if(user_agent_type == 'server'){
-                    this.uas_responses(msg, client_callback)
+                    if(this.transparent == true){
+                        client_callback({type:res.method || res.statusCode, message:res})
+                    }else{
+                        this.uas_responses(msg, client_callback)
+                    }
                 }
-                return;
             }else{
                 cb(res);
             }
@@ -124,13 +140,11 @@ class VOIP{
             this.message_stack[branch][tag] = [];
         }
         this.message_stack[branch][tag].push({message, callback: msg_callback, sent: true})
-        console.log('server_send > message_stack')
-        console.log(this.message_stack)
     }
 
     send(message, msg_callback){
         var built = SIP.Builder.Build(message)   
-        this.transport.send(built, this.register_ip, 5060)
+        this.transport.send(built, this.register_ip, this.register_port)
         var tag = SIP.Parser.ParseHeaders(message.headers).From.tag;
         var branch = SIP.Parser.ParseHeaders(message.headers).Via.branch;
         if(!this.message_stack[branch]){
@@ -149,10 +163,6 @@ class VOIP{
         var tag = SIP.Parser.ParseHeaders(res.headers).From.tag;
         var branch = SIP.Parser.ParseHeaders(res.headers).Via.branch;
         var type = res.method || res.statusCode;
-
-        console.trace();
-        console.log('UAC RESPONSES')
-
         if(type == 'NOTIFY'){
             console.log('uac_responses > NOTIFY')
             this.send(this.response({   
@@ -222,42 +232,6 @@ class VOIP{
                     auth_required: true
                 }), client_ip, client_port)
             }
-
-            //this.server_send(this.response({
-            //    statusCode: 401,
-            //    statusText: 'Unauthorized',
-            //    headers: parsed_headers,
-            //    auth_required: true
-            //}), client_ip, client_port, (d) => {
-            //    parsed_headers = SIP.Parser.ParseHeaders(d.headers);
-            //    if(d.method == 'REGISTER'){
-            //        console.log(parsed_headers.Authorization)
-            //        console.log('above is parsed_headers.Authorization')
-            //        if(parsed_headers.Authorization !== undefined){
-            //            this.UserManager.users[client_username].registered = true;
-            //            console.log(this.UserManager.users)
-            //            this.server_send(this.response({
-            //                statusCode: 200,
-            //                statusText: 'OK',
-            //                headers: parsed_headers,
-            //                expires: 3600
-            //            }), client_ip, client_port)
-            //            this.Router.addRoute({
-            //                name: `Extension ${client_username}`,
-            //                type: 'extension',
-            //                match: `^${client_username}$`,
-            //                endpoint: client_username
-            //            })
-            //        }else{
-            //            this.server_send(this.response({
-            //                statusCode: 401,
-            //                statusText: 'Unauthorized',
-            //                headers: parsed_headers,
-            //                auth_required: true
-            //            }), client_ip, client_port)
-            //        }
-            //    }
-            //})
         }else{
             this.server_send(this.response({
                 statusCode: 403,
@@ -279,24 +253,29 @@ class VOIP{
             let endpoint = this.Router.route(callee);
             console.log('ENDPOINT')
             console.log(endpoint)
-            console.log(endpoint.type)
-            if(endpoint.type == 'trunk'){
+            if(endpoint == null){
+                this.server_send(this.response({
+                    statusCode: 404,
+                    statusText: 'Not Found',
+                    headers: parsed_headers
+                }), parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
+            }else if(endpoint.type.toLowerCase() == 'trunk'){
                 let final_ep = this.TrunkManager.trunks[endpoint.endpoint];
+                console.log(this.TrunkManager.trunks[endpoint.endpoint])
+
+                this.accept(msg, SIP.Parser.parse(msg.toString()).body, client_callback)
+
                 final_ep.uac.call({username:caller, to: callee, ip: final_ep.uac.register_ip, port: final_ep.uac.register_port, client_callback: (d) => {
                     console.log('call callback')
                     console.log(d)
                 }})
-            }else if(endpoint.type == 'extension'){
+            }else if(endpoint.type.toLowerCase() == 'extension'){
                 let final_ep = this.UserManager.users[endpoint.endpoint];
                 console.log('uas_handle_invite > uac_call')
-                this.uas_call({
-                    message: msg,
-                    endpoint: final_ep,
-                    client_callback: (d) => {
-                        console.log('call callback')
-                        console.log(d)
-                    }
-                })
+
+                this.internal_uac.call({username:caller, to: callee, ip: final_ep.ip, port: final_ep.port, client_callback: (d) => {
+
+                }})
             }
         }else{
             //401 Unauthorized
@@ -375,83 +354,6 @@ class VOIP{
         sendRegister();
     }
 
-    uas_call(props){
-        let cseq = 1;
-        let parsed_headers = SIP.Parser.ParseHeaders(props.message.headers);
-        let branch = parsed_headers.Via.branch;
-        let tag = parsed_headers.From.tag;
-
-        console.log(props.endpoint)
-
-
-        parsed_headers.To.tag = SIP.Builder.generateTag();
-
-
-        let trying = this.response({
-            statusCode: 100,
-            statusText: 'Trying',
-            headers: parsed_headers
-        })
-
-        let ringing = this.response({
-            statusCode: 180,
-            statusText: 'Ringing',
-            headers: parsed_headers
-        })
-
-        this.server_send(trying, parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
-        this.server_send(ringing, parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
-
-        let invite_headers = {
-            to: props.endpoint.extension,
-            ip: props.endpoint.ip,
-            port: props.endpoint.port,
-            username: parsed_headers.From.contact.username,
-            callId: SIP.Builder.generateBranch(),
-            cseq: cseq,
-            branchId: SIP.Builder.generateBranch(),
-            from_tag: SIP.Builder.generateTag(),
-            body: props.body,
-            password: this.register_password,
-            requestUri: `sip:${props.endpoint.extension}@${props.endpoint.ip}:${props.endpoint.port}`,
-            remote_port: this.transport.port,
-        };
-
-        let invite_msg = SIP.Builder.SIPMessageObject('INVITE', invite_headers);
-        this.server_send(invite_msg, props.endpoint.ip, props.endpoint.port, (d) => {
-            console.log('PLEASE WORK PLEEEAAASSEEE')
-            console.log(d)
-        })
-
-        //send INVITE to Callee
-        //let invite_headers = {
-        //    to: props.endpoint.extension,
-
-
-        //let h = {
-        //    to: props.endpoint.extension,
-        //    ip: props.endpoint.ip,
-        //    port: props.endpoint.port,
-        //    username: parsed_headers.From.contact.username,
-        //    callId: SIP.Builder.generateBranch(),
-        //    cseq: cseq,
-        //    branchId: SIP.Builder.generateBranch(),
-        //    from_tag: SIP.Builder.generateTag(),
-        //    body: props.body,
-        //    password: this.register_password,
-        //    requestUri: `sip:${props.endpoint.extension}@${props.endpoint.ip}:${props.endpoint.port}`,
-        //    remote_port: this.transport.port,
-        //};
-//
-        //let invite_msg = SIP.Builder.SIPMessageObject('INVITE', h);
-        //this.server_send(invite_msg, props.endpoint.ip, props.endpoint.port, (d) => {
-        //    console.log('uas_call > server_send > callback')
-        //    console.log(d)
-        //    console.log('uas_call > server_send > callback')
-        //})
-
-    }
-
     call(props){
         var cseq = 1;
         var try_count = 0;
@@ -486,16 +388,15 @@ class VOIP{
                 props.client_callback({type:'CALL_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
                 return;
             }
+
+            
             let inv_responses = (response) => {
                 if(response.statusCode == 400){
                     console.log('400 Bad Request');
                     return;
-                }else if (response.statusCode == 401) {
-                    let challenge_data = SIP.Parser.ParseHeaders(response.headers)['WWW-Authenticate'];
+                }else if (response.statusCode == 401 || response.statusCode == 407) {
+                    let challenge_data = (response.statusCode == 401) ? SIP.Parser.ParseHeaders(response.headers)['WWW-Authenticate'] : SIP.Parser.ParseHeaders(response.headers)['Proxy-Authenticate'];
                     sendInvite(challenge_data, false);
-                }else if(response.statusCode == 407){
-                    let challenge_data = SIP.Parser.ParseHeaders(response.headers)['Proxy-Authenticate'];
-                    sendInvite(challenge_data, true);
                 }else if (response.statusCode == 100) {
                     console.log('100 Trying');
                     return;
@@ -511,7 +412,19 @@ class VOIP{
                     console.log('183 Session Progress');
                     return
                 }else if (response.statusCode == 200) {
-                    this.ack(response);
+                    if(this.server_uac == true){
+                        this.server_send(this.response({   
+                            statusCode: 200,
+                            statusText: 'OK',
+                            headers: SIP.Parser.ParseHeaders(response.headers)
+                        }), h.ip, h.port)
+                    }else{
+                        this.send(this.response({   
+                            statusCode: 200,
+                            statusText: 'OK',
+                            headers: SIP.Parser.ParseHeaders(response.headers)
+                        }))
+                    }
                     props.client_callback({type:'CALL_CONNECTED', message:response, sdp: response.body});
                     return;
                 }else if (response.isResponse == false && response.method == 'BYE') {
@@ -521,7 +434,7 @@ class VOIP{
                         statusText: 'OK',
                         headers: SIP.Parser.ParseHeaders(response.headers)
                     })
-                    if(this.type == 'server'){
+                    if(this.server_uac == true){
                         this.server_send(res, h.ip, h.port)
                     }else{
                         this.send(res)  
@@ -544,11 +457,11 @@ class VOIP{
 
             let inv_message = SIP.Builder.SIPMessageObject('INVITE', h, challenge_headers, proxy_auth);
 
-            if(this.type == 'server'){
+            if(this.server_uac == true){
                 this.server_send(inv_message, h.ip, h.port, (response) => {
                     inv_responses(response)
                 });
-            }else if(this.type == 'client'){
+            }else{
                 this.send(inv_message, (response) => {
                     inv_responses(response)
                 });
@@ -556,46 +469,6 @@ class VOIP{
         };
         
         sendInvite();
-    }
-
-    accept(message, sdp, client_callback){
-        console.log('accept')
-        var cseq = 1;
-        let our_sdp = `v=0
-                        o=- 123456789 123456789 IN IP4 192.168.1.110
-                        s=Asterisk Call
-                        c=IN IP4 192.168.1.110
-                        t=0 0
-                        m=audio 5005 RTP/AVP 8
-                        a=rtpmap:8 PCMA/8000
-                        a=fmtp:8 0-15`.replace(/^[ \t]+/gm, '');
-        var headers = SIP.Parser.ParseHeaders(message.headers);
-        this.send(this.response({
-            statusCode: 100,
-            statusText: 'Trying',
-            headers: headers
-        }))
-        this.send(this.response({
-            statusCode: 180,
-            statusText: 'Ringing',
-            headers: headers
-        }))
-        this.send(this.response({
-            statusCode: 200,
-            statusText: 'OK',
-            headers: headers,
-            body: our_sdp
-        }), (d) => {
-            if(d.isResponse == false && d.method == 'BYE'){
-                this.send(this.response({   
-                    statusCode: 200,
-                    statusText: 'OK',
-                    headers: SIP.Parser.ParseHeaders(res.headers)
-                }))  
-                return;
-            }
-        })
-        client_callback({type:'CALL_ACCEPTED', message:message, sdp: sdp});
     }
 
     reject(message){
