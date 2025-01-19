@@ -251,6 +251,7 @@ class VOIP{
             let callee = parsed_headers.To.contact.username;
             let caller = parsed_headers.From.contact.username;
             let endpoint = this.Router.route(callee);
+            let caller_endpoint = this.Router.route(caller);    
             console.log('ENDPOINT')
             console.log(endpoint)
             if(endpoint == null){
@@ -271,10 +272,54 @@ class VOIP{
                 }})
             }else if(endpoint.type.toLowerCase() == 'extension'){
                 let final_ep = this.UserManager.users[endpoint.endpoint];
-                console.log('uas_handle_invite > uac_call')
-
-                this.internal_uac.call({username:caller, to: callee, ip: final_ep.ip, port: final_ep.port, client_callback: (d) => {
-
+                let caller_final_ep = this.UserManager.users[caller_endpoint.endpoint];
+                this.internal_uac.uac_init_call({username:caller, to: callee, ip: final_ep.ip, port: final_ep.port, client_callback: (d) => {
+                    parsed_headers = SIP.Parser.ParseHeaders(d.message.headers);
+                    parsed_headers.Via.uri.ip = caller_final_ep.ip;
+                    parsed_headers.Via.uri.port = caller_final_ep.port;
+                    parsed_headers.Via.branch = d.generated_branch;
+                    parsed_headers.From.tag = d.generated_tag;
+                    console.log("INTERNAL UAC CALLBACK")
+                    if(d.type == 100){
+                        this.server_send(this.response({
+                            statusCode: 100,
+                            statusText: 'Trying',
+                            headers: parsed_headers
+                        }), caller_final_ep.ip, caller_final_ep.port)
+                    }else if(d.type == 180){
+                        this.server_send(this.response({
+                            statusCode: 180,
+                            statusText: 'Ringing',
+                            headers: parsed_headers
+                        }), caller_final_ep.ip, caller_final_ep.port)
+                    }else if(d.type == 200){
+                        this.server_send(this.response({
+                            statusCode: 200,
+                            statusText: 'OK',
+                            headers: parsed_headers,
+                            body: d.sdp
+                        }), caller_final_ep.ip, caller_final_ep.port)
+                    }else if(d.type == 486){
+                        this.server_send(this.response({
+                            statusCode: 486,
+                            statusText: 'Busy Here',
+                            headers: parsed_headers
+                        }), caller_final_ep.ip, caller_final_ep.port)
+                    }else if(d.type == 403){
+                        this.server_send(this.response({
+                            statusCode: 403,
+                            statusText: 'Forbidden',
+                            headers: parsed_headers
+                        }), caller_final_ep.ip, caller_final_ep.port)
+                    }else if(d.type == 408){
+                        this.server_send(this.response({
+                            statusCode: 408,
+                            statusText: 'Request Timeout',
+                            headers: parsed_headers
+                        }), caller_final_ep.ip, caller_final_ep.port)
+                    }else{
+                        console.log('Unexpected response')
+                    }
                 }})
             }
         }else{
@@ -353,6 +398,68 @@ class VOIP{
 
         sendRegister();
     }
+
+    uac_init_call(props){
+        var cseq = 1;
+        var try_count = 0;
+        var sdp = `v=0
+        o=- 123456789 123456789 IN IP4 ${utils.getLocalIpAddress()}
+        s=node.js-sip Call
+        c=IN IP4 ${utils.getLocalIpAddress()}
+        t=0 0
+        m=audio 5005 RTP/AVP 8
+        a=rtpmap:8 PCMA/8000
+        a=fmtp:8 0-15`.replace(/^[ \t]+/gm, '');
+
+        let h = {
+            to: props.to,
+            ip: props.ip || this.register_ip,
+            port: props.port,
+            username: props.username,
+            callId: SIP.Builder.generateBranch(),
+            cseq: cseq,
+            branchId: SIP.Builder.generateBranch(),
+            from_tag: SIP.Builder.generateTag(),
+            body: sdp,
+            password: this.register_password,
+            requestUri: `sip:${props.to}@${props.ip}:${props.port}`,
+            remote_port: this.transport.port,
+        };
+
+        const sendInvite = (challenge_headers, proxy_auth = false) => {
+            try_count++;
+            if(try_count > this.max_retries){
+                console.log('Max retries reached');
+                props.client_callback({type:'CALL_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
+                return;
+            }
+            let inv_message = SIP.Builder.SIPMessageObject('INVITE', h, challenge_headers, proxy_auth);
+            let responses = (response) => {
+                if(response.statusCode == 400){
+                    console.log('400 Bad Request');
+                    return;
+                }else if (response.statusCode == 401 || response.statusCode == 407) {
+                    let challenge_data = (response.statusCode == 401) ? SIP.Parser.ParseHeaders(response.headers)['WWW-Authenticate'] : SIP.Parser.ParseHeaders(response.headers)['Proxy-Authenticate'];
+                    sendInvite(challenge_data, false);
+                }else{
+                    props.client_callback({type: response.statusCode || response.method, message: response, generated_branch: h.branchId, generated_tag: h.from_tag, sdp: response.body});
+                }
+            }
+
+            if(this.server_uac == true){
+                this.server_send(inv_message, h.ip, h.port, (response) => {
+                    responses(response)
+                });
+            }else{
+                this.send(inv_message, (response) => {
+                    responses(response)
+                });
+            }
+        }
+
+        sendInvite();
+    }
+
 
     call(props){
         var cseq = 1;
