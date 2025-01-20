@@ -284,18 +284,12 @@ class VOIP{
                 this.internal_uac.uac_init_call({username:caller, to: callee, ip: final_ep.ip, port: final_ep.port, client_callback: (root_response) => {
                     let root_response_headers = SIP.Parser.ParseHeaders(root_response.message.headers);
                     console.log("INTERNAL UAC CALLBACK")
-                    if(root_response.type == 100){
-                        this.server_send(this.response({
-                            isResponse: true,
-                            statusCode: 100,
-                            statusText: 'Trying',
-                            headers: root_invite_headers,
-                        }), caller_final_ep.ip, caller_final_ep.port, (d) => {
-                            console.log('100 Trying callback')
-                            console.log(d)    
-                        })
-                    }else if(root_response.type == 200){
-                        let ack_headers = root_response_headers;
+                    root_response.message.headers = root_response_headers;
+                    root_response.message.headers.Via.branch = root_invite_headers.Via.branch;
+                    root_response.message.headers.From.tag = root_invite_headers.From.tag;
+                    this.server_send(this.response(root_response.message), caller_final_ep.ip, caller_final_ep.port)
+                    if(root_response.type == 200){
+                        let ack_headers = root_invite_headers;
                         this.internal_uac.server_send(this.internal_uac.response({
                             isResponse: false,
                             method: 'ACK',
@@ -303,53 +297,63 @@ class VOIP{
                             requestUri: `sip:${ack_headers.To.contact.username}@${ack_headers.Via.uri.ip}:${ack_headers.Via.uri.port}`,
                         }), final_ep.ip, final_ep.port, (d) => {
                             console.log('ACK CALLBACK') 
-                            if(d.statusCode == 200){
-                                console.log('ACK Received We were sent 200 OK')
-                                console.log(d)
-                                let ok_headers = SIP.Parser.ParseHeaders(d.headers);
-                                ok_headers.Via.branch = root_response.generated_branch;
-                                ok_headers.Via.uri.ip = caller_final_ep.ip;
-                                ok_headers.Via.uri.port = caller_final_ep.port;
-                                ok_headers.To.contact.username = caller;
-                                ok_headers.From.contact.username = callee;
-                                ok_headers.From.tag = root_response.generated_tag;
-                                ok_headers.Contact.contact.username = caller;
-                                ok_headers.Contact.contact.ip = caller_final_ep.ip;
-                                ok_headers.Contact.contact.port = caller_final_ep.port;
-
-                                this.server_send(this.response({
-                                    isResponse: true,
-                                    statusCode: 200,
-                                    statusText: 'OK',
-                                    headers: ok_headers,
-                                    body: d.sdp
-                                }), caller_final_ep.ip, caller_final_ep.port)
-                            }
+                            console.log(d)
                         })
-                    }else if(root_response.type == 486){
-                        this.server_send(this.response({
-                            isResponse: true,
-                            statusCode: 486,
-                            statusText: 'Busy Here',
-                            headers: root_response_headers,
-                        }), caller_final_ep.ip, caller_final_ep.port)
-                    }else if(root_response.type == 403){
-                        this.server_send(this.response({
-                            isResponse: true,
-                            statusCode: 403,
-                            statusText: 'Forbidden',
-                            headers: root_response_headers,
-                        }), caller_final_ep.ip, caller_final_ep.port)
-                    }else if(root_response.type == 408){
-                        this.server_send(this.response({
-                            isResponse: true,
-                            statusCode: 408,
-                            statusText: 'Request Timeout',
-                            headers: root_response_headers,
-                        }), caller_final_ep.ip, caller_final_ep.port)
-                    }else{
-                        console.log('Unexpected response')
                     }
+
+                    //if(root_response.type == 100){
+                    //    this.server_send(this.response({
+                    //        isResponse: true,
+                    //        statusCode: 100,
+                    //        statusText: 'Trying',
+                    //        headers: root_invite_headers,
+                    //    }), caller_final_ep.ip, caller_final_ep.port)
+                    //}else if(root_response.type == 180){
+                    //    this.server_send(this.response({
+                    //        isResponse: true,
+                    //        statusCode: 180,
+                    //        statusText: 'Ringing',
+                    //        headers: root_response_headers,
+                    //        body: root_response.message.body
+                    //    }), caller_final_ep.ip, caller_final_ep.port)
+                    //}else if(root_response.type == 200){
+                    //    let ack_headers = root_response_headers;
+                    //    this.internal_uac.server_send(this.internal_uac.response({
+                    //        isResponse: false,
+                    //        method: 'ACK',
+                    //        headers: ack_headers,
+                    //        requestUri: `sip:${ack_headers.To.contact.username}@${ack_headers.Via.uri.ip}:${ack_headers.Via.uri.port}`,
+                    //    }), final_ep.ip, final_ep.port, (d) => {
+                    //        console.log('ACK CALLBACK') 
+                    //        d.headers = SIP.Parser.ParseHeaders(d.headers);
+                    //        d.headers.Via.branch = root_invite_headers.Via.branch;
+                    //        d.headers.From.tag = root_invite_headers.From.tag;
+                    //        this.server_send(this.response(d), caller_final_ep.ip, caller_final_ep.port)
+                    //    })
+                    //}else if(root_response.type == 486){
+                    //    this.server_send(this.response({
+                    //        isResponse: true,
+                    //        statusCode: 486,
+                    //        statusText: 'Busy Here',
+                    //        headers: root_response_headers,
+                    //    }), caller_final_ep.ip, caller_final_ep.port)
+                    //}else if(root_response.type == 403){
+                    //    this.server_send(this.response({
+                    //        isResponse: true,
+                    //        statusCode: 403,
+                    //        statusText: 'Forbidden',
+                    //        headers: root_response_headers,
+                    //    }), caller_final_ep.ip, caller_final_ep.port)
+                    //}else if(root_response.type == 408){
+                    //    this.server_send(this.response({
+                    //        isResponse: true,
+                    //        statusCode: 408,
+                    //        statusText: 'Request Timeout',
+                    //        headers: root_response_headers,
+                    //    }), caller_final_ep.ip, caller_final_ep.port)
+                    //}else{
+                    //    console.log('Unexpected response')
+                    //}
                 }})
             }
         }else{
