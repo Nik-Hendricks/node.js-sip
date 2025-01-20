@@ -76,10 +76,6 @@ class VOIP{
             }
             var tag = SIP.Parser.ParseHeaders(res.headers).From.tag;
             var branch = SIP.Parser.ParseHeaders(res.headers).Via.branch;
-
-            console.log('sip_event_listener > message_stack')
-            console.log(this.message_stack)
-
             let check_for_callbacks = (tag, branch) => {
                 let mg = [].concat.apply([], Object.entries(this.message_stack[branch]).map((d => d[1]))).filter((d) => d.sent == true)
                 if(mg.length == 0){
@@ -106,10 +102,7 @@ class VOIP{
                 this.message_stack[branch][tag] = [];
             }
             this.message_stack[branch][tag].push({message:res, sent: false})
-
             let cb = check_for_callbacks(tag, branch);
-            console.log('cb > ', cb)
-
             if(cb == undefined){
                 console.log('no callback')
                 if(user_agent_type == 'client'){
@@ -157,8 +150,6 @@ class VOIP{
             this.message_stack[branch][tag] = [];
         }
         this.message_stack[branch][tag].push({message, callback: msg_callback, sent: true})
-        console.log('send > message_stack')
-        console.log(this.message_stack)
     }
 
     uac_responses(msg, client_callback){
@@ -185,14 +176,6 @@ class VOIP{
         }else if (type == 'INVITE') {
             console.log('uac_responses > INVITE')
             this.accept(res, SIP.Parser.parse(msg.toString()).body, client_callback)
-        }else if(type == 401){
-            console.log('uac_responses > 401')
-            this.send(this.response({   
-                isResponse: true,
-                statusCode: 401,
-                statusText: 'Unauthorized',
-                headers: SIP.Parser.ParseHeaders(res.headers)
-            }))
         }
     }
 
@@ -295,6 +278,7 @@ class VOIP{
                             method: 'ACK',
                             headers: ack_headers,
                             requestUri: `sip:${ack_headers.To.contact.username}@${ack_headers.Via.uri.ip}:${ack_headers.Via.uri.port}`,
+                            sdp: root_response.message.body
                         }), final_ep.ip, final_ep.port, (d) => {
                             console.log('ACK CALLBACK') 
                             console.log(d)
