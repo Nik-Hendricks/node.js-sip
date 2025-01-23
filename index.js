@@ -344,6 +344,7 @@ class VOIP{
                             props.callId = SIP.Builder.generateBranch();
                             this.register(props, client_callback);
                         }, parsed_headers.Contact.expires * 1000);
+                        this.status = 'REGISTERED';
                         client_callback({type:'REGISTERED', message:d})
                     }else if(d.statusCode == 401){
                         let challenge_data = SIP.Parser.ParseHeaders(d.headers)['WWW-Authenticate'];
