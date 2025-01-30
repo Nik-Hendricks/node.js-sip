@@ -40,6 +40,7 @@ class Router{
             if(desired_endpoint.match(this.routes[route].match)){
                 ret = this.routes[route];
                 ret.endpoint_type = this.endpoint_types[ret.type];
+                console.log(ret.endpoint_type.manager.items)
                 ret.endpoint = ret.endpoint_type.manager.items[ret.endpoint];
             }
         }

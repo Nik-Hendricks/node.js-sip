@@ -93,6 +93,18 @@ class VOIP{
                 }})
             }
         })
+
+        this.Router.addEndpointType({
+            type: 'VOIP/IVR',
+            manager: this.IVRManager,
+            behavior: (props) => {
+                console.log('IVR BEHAVIOR')
+                //
+                console.log(props.callee_endpoint)
+                console.log(this.IVRManager[props.callee_endpoint.endpoint])
+
+            }
+        })
         
         callback({type:'UAS_READY'})
         this.sip_event_listener(callback, 'server');
@@ -291,7 +303,11 @@ class VOIP{
             let callee_endpoint = this.Router.route(root_invite_headers.To.contact.username);
             let caller_endpoint = this.Router.route(root_invite_headers.From.contact.username);
             if(callee_endpoint !== null || caller_endpoint !== null){
-                callee_endpoint.endpoint_type.behavior({callee_endpoint, caller_endpoint, root_invite_headers: SIP.Parser.ParseHeaders(msg.headers)})
+                callee_endpoint.endpoint_type.behavior({
+                    callee_endpoint: this.Router.route(root_invite_headers.To.contact.username),
+                    caller_endpoint: this.Router.route(root_invite_headers.From.contact.username),
+                    root_invite_headers: SIP.Parser.ParseHeaders(msg.headers)
+                })
             }else{
                 this.server_send(this.response({
                     isResponse: true,
