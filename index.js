@@ -27,7 +27,8 @@ class VOIP{
     UAS(props, callback){
         this.TrunkManager = new SIP.TrunkManager(VOIP); //need to pass the VOIP class through so that new UACs can be created as the Trunks.
         this.UserManager = new SIP.UserManager();
-        this.Router = props.Router || new SIP.Router();
+        this.IVRManager = new SIP.IVRManager();
+        this.Router = props.Router || new SIP.Router({context: this});
         this.internal_uac = new VOIP({
             type:'client',
             server_uac: true,
@@ -40,6 +41,57 @@ class VOIP{
         }, (d) => {
             console.log('internal_uac callback')
             console.log(d)
+        })
+
+        this.Router.addEndpointType({
+            type: 'trunk',
+            manager: this.TrunkManager,
+            behavior: (d) => {
+                console.log('TRUNK BEHAVIOR')
+                console.log(d)
+                let final_ep = this.TrunkManager.items[endpoint.endpoint];
+                this.accept(msg, SIP.Parser.parse(msg.toString()).body, client_callback)
+                final_ep.uac.call({username:caller, to: callee, ip: final_ep.uac.register_ip, port: final_ep.uac.register_port, client_callback: (d) => {
+                    console.log('call callback')
+                    console.log(d)
+                }})
+            }
+        })
+
+        this.Router.addEndpointType({
+            type: 'extension',
+            manager: this.UserManager,
+            behavior: (props) => {
+                console.log('EXTENSION BEHAVIOR')
+                console.log(props)
+
+                let final_ep = props.callee_endpoint;
+                let caller_final_ep = props.caller_endpoint;
+                this.internal_uac.uac_init_call({username:props.caller_endpoint.endpoint.extension, to: props.callee_endpoint.endpoint.extension, ip: props.callee_endpoint.endpoint.ip, port: props.callee_endpoint.endpoint.port, client_callback: (root_response) => {
+                    let root_response_headers = SIP.Parser.ParseHeaders(root_response.message.headers);
+                    let m = root_response.message;
+                    m.headers = SIP.Parser.ParseHeaders(m.headers);
+                    m.headers.Via.branch = props.root_invite_headers.Via.branch;
+                    m.headers.From.tag = props.root_invite_headers.From.tag;
+                    console.log("INTERNAL UAC CALLBACK")
+                    this.server_send(this.response(m), props.caller_endpoint.endpoint.ip, props.caller_endpoint.endpoint.port)
+                    if(root_response.type == 200){
+                        let ack_headers = props.root_invite_headers;
+                        ack_headers.Via.branch = root_response_headers.Via.branch;
+                        ack_headers.From.tag = root_response_headers.From.tag;
+                        this.internal_uac.server_send(this.internal_uac.response({
+                            isResponse: false,
+                            method: 'ACK',
+                            headers: ack_headers,
+                            requestUri: `sip:${ack_headers.To.contact.username}@${ack_headers.Via.uri.ip}:${ack_headers.Via.uri.port}`,
+                            sdp: root_response.message.body
+                        }), props.callee_endpoint.endpoint.ip, props.callee_endpoint.endpoint.port, (d) => {
+                            console.log('ACK CALLBACK') 
+                            console.log(d)
+                        })
+                    }
+                }})
+            }
         })
         
         callback({type:'UAS_READY'})
@@ -194,12 +246,12 @@ class VOIP{
         let client_port = parsed_headers.Contact.contact.port;
         console.log(parsed_headers)
 
-        if(this.UserManager.users[client_username] !== undefined){
-            this.UserManager.users[client_username].ip = client_ip;
-            this.UserManager.users[client_username].port = client_port;
+        if(this.UserManager.items[client_username] !== undefined){
+            this.UserManager.items[client_username].ip = client_ip;
+            this.UserManager.items[client_username].port = client_port;
             let authorization = parsed_headers.Authorization;
             if(authorization !== undefined){
-                this.UserManager.users[client_username].registered = true;
+                this.UserManager.items[client_username].registered = true;
                 this.server_send(this.response({
                     isResponse: true,
                     statusCode: 200,
@@ -234,57 +286,19 @@ class VOIP{
 
     uas_handle_invite(msg, client_callback){
         console.log('uas_handle_invite')
-        var parsed_headers = SIP.Parser.ParseHeaders(msg.headers);
         let root_invite_headers = SIP.Parser.ParseHeaders(msg.headers);
-        let callee = root_invite_headers.To.contact.username;
-        let caller = root_invite_headers.From.contact.username;
-
-        if(root_invite_headers.Authorization !== undefined){
-            let endpoint = this.Router.route(callee);
-            let caller_endpoint = this.Router.route(caller);    
-            console.log('ENDPOINT')
-            console.log(endpoint)
-            if(endpoint == null){
+        if(root_invite_headers.Authorization !== undefined){ 
+            let callee_endpoint = this.Router.route(root_invite_headers.To.contact.username);
+            let caller_endpoint = this.Router.route(root_invite_headers.From.contact.username);
+            if(callee_endpoint !== null || caller_endpoint !== null){
+                callee_endpoint.endpoint_type.behavior({callee_endpoint, caller_endpoint, root_invite_headers: SIP.Parser.ParseHeaders(msg.headers)})
+            }else{
                 this.server_send(this.response({
                     isResponse: true,
                     statusCode: 404,
                     statusText: 'Not Found',
                     headers: root_invite_headers
                 }), root_invite_headers.Contact.contact.ip, root_invite_headers.Contact.contact.port)
-            }else if(endpoint.type.toLowerCase() == 'trunk'){
-                let final_ep = this.TrunkManager.trunks[endpoint.endpoint];
-                this.accept(msg, SIP.Parser.parse(msg.toString()).body, client_callback)
-                final_ep.uac.call({username:caller, to: callee, ip: final_ep.uac.register_ip, port: final_ep.uac.register_port, client_callback: (d) => {
-                    console.log('call callback')
-                    console.log(d)
-                }})
-            }else if(endpoint.type.toLowerCase() == 'extension'){
-                let final_ep = this.UserManager.users[endpoint.endpoint];
-                let caller_final_ep = this.UserManager.users[caller_endpoint.endpoint];
-                this.internal_uac.uac_init_call({username:caller, to: callee, ip: final_ep.ip, port: final_ep.port, client_callback: (root_response) => {
-                    let root_response_headers = SIP.Parser.ParseHeaders(root_response.message.headers);
-                    let m = root_response.message;
-                    m.headers = SIP.Parser.ParseHeaders(m.headers);
-                    m.headers.Via.branch = root_invite_headers.Via.branch;
-                    m.headers.From.tag = root_invite_headers.From.tag;
-                    console.log("INTERNAL UAC CALLBACK")
-                    this.server_send(this.response(m), caller_final_ep.ip, caller_final_ep.port)
-                    if(root_response.type == 200){
-                        let ack_headers = root_invite_headers;
-                        ack_headers.Via.branch = root_response_headers.Via.branch;
-                        ack_headers.From.tag = root_response_headers.From.tag;
-                        this.internal_uac.server_send(this.internal_uac.response({
-                            isResponse: false,
-                            method: 'ACK',
-                            headers: ack_headers,
-                            requestUri: `sip:${ack_headers.To.contact.username}@${ack_headers.Via.uri.ip}:${ack_headers.Via.uri.port}`,
-                            sdp: root_response.message.body
-                        }), final_ep.ip, final_ep.port, (d) => {
-                            console.log('ACK CALLBACK') 
-                            console.log(d)
-                        })
-                    }
-                }})
             }
         }else{
             //401 Unauthorized

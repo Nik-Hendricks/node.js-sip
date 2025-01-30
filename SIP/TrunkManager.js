@@ -1,15 +1,15 @@
 class TrunkManager {
     constructor(VOIP) {
-        this.trunks = {};
+        this.items = {};
         this.VOIP = VOIP;
     }
 
     addTrunk(props) {
-        this.trunks[props.name] = this.Trunk(props);
+        this.items[props.name] = this.Trunk(props);
     }
 
     removeTrunk(name) {
-        delete this.trunks[name];
+        delete this.items[name];
     }
 
     Trunk(props){

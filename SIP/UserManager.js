@@ -1,14 +1,14 @@
 class UserManager {
     constructor() {
-        this.users = {};
+        this.items = {};
     }
 
     addUser(props) {
-        this.users[props.extension] = this.User(props);
+        this.items[props.extension] = this.User(props);
     }
 
     removeUser(extension) {
-        delete this.users[extension];
+        delete this.items[extension];
     }
 
     User(props){
