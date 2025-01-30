@@ -63,7 +63,7 @@ class VOIP{
             manager: this.UserManager,
             behavior: (props) => {
                 console.log('EXTENSION BEHAVIOR')
-                console.log(props)
+                //console.log(props)
 
                 let final_ep = props.callee_endpoint;
                 let caller_final_ep = props.caller_endpoint;
@@ -101,7 +101,7 @@ class VOIP{
                 console.log('IVR BEHAVIOR')
                 //
                 console.log(props.callee_endpoint)
-                console.log(this.IVRManager[props.callee_endpoint.endpoint])
+                console.log(this.IVRManager.items[props.callee_endpoint.endpoint.name])
 
             }
         })
@@ -304,8 +304,8 @@ class VOIP{
             let caller_endpoint = this.Router.route(root_invite_headers.From.contact.username);
             if(callee_endpoint !== null || caller_endpoint !== null){
                 callee_endpoint.endpoint_type.behavior({
-                    callee_endpoint: this.Router.route(root_invite_headers.To.contact.username),
-                    caller_endpoint: this.Router.route(root_invite_headers.From.contact.username),
+                    callee_endpoint: callee_endpoint,
+                    caller_endpoint: caller_endpoint,
                     root_invite_headers: SIP.Parser.ParseHeaders(msg.headers)
                 })
             }else{

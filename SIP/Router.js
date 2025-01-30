@@ -11,10 +11,10 @@ class Router{
 
     addRoute(props){
         this.routes[props.name] = {
-            name: props.name,
-            type: props.type,
-            match: props.match,
-            endpoint: props.endpoint,
+            name: String(props.name),
+            type: String(props.type),
+            match: String(props.match),
+            endpoint: String(props.endpoint),
         }
 
         console.log(this.routes)
@@ -38,10 +38,9 @@ class Router{
 
         for(var route in this.routes){
             if(desired_endpoint.match(this.routes[route].match)){
-                ret = this.routes[route];
+                ret = {...this.routes[route]}
                 ret.endpoint_type = this.endpoint_types[ret.type];
-                console.log(ret.endpoint_type.manager.items)
-                ret.endpoint = ret.endpoint_type.manager.items[ret.endpoint];
+                ret.endpoint =  ret.endpoint_type.manager.items[ret.endpoint];
             }
         }
 
