@@ -98,10 +98,35 @@ class VOIP{
             type: 'VOIP/IVR',
             manager: this.IVRManager,
             behavior: (props) => {
-                console.log('IVR BEHAVIOR')
-                //
-                console.log(props.callee_endpoint)
-                console.log(this.IVRManager.items[props.callee_endpoint.endpoint.name])
+                console.log('IVR BEHAVIOR')        
+                let h = {...props.root_invite_headers};
+                h.From = props.root_invite_headers.To;
+                h.From.contact.username = `IVR ${props.callee_endpoint.endpoint.name}`;
+                h.From.tag = props.root_invite_headers.From.tag;
+                h.To = props.root_invite_headers.From;
+                this.server_send(this.response({
+                    isResponse: true,
+                    statusCode: 200,
+                    statusText: 'OK',
+                    headers: h,
+                    body:  `v=0
+                            o=Z 0 177241510 IN IP4 192.168.1.12
+                            s=Z
+                            c=IN IP4 192.168.1.143
+                            t=0 0
+                            m=audio 5050 RTP/AVP 106 9 98 101 0 8 3
+                            a=rtpmap:106 opus/48000/2
+                            a=fmtp:106 sprop-maxcapturerate=16000; minptime=20; useinbandfec=1
+                            a=rtpmap:98 telephone-event/48000
+                            a=fmtp:98 0-16
+                            a=rtpmap:101 telephone-event/8000
+                            a=fmtp:101 0-16
+                            a=sendrecv
+                            a=rtcp-mux`.replace(/^[ \t]+/gm, '')
+                }),h.Contact.contact.ip, h.Contact.contact.port)
+
+
+                this.IVRManager.items[props.callee_endpoint.endpoint.name].start_stream(props.root_invite_body)
 
             }
         })
@@ -302,11 +327,12 @@ class VOIP{
         if(root_invite_headers.Authorization !== undefined){ 
             let callee_endpoint = this.Router.route(root_invite_headers.To.contact.username);
             let caller_endpoint = this.Router.route(root_invite_headers.From.contact.username);
-            if(callee_endpoint !== null || caller_endpoint !== null){
+            if(callee_endpoint !== null && caller_endpoint !== null){
                 callee_endpoint.endpoint_type.behavior({
                     callee_endpoint: callee_endpoint,
                     caller_endpoint: caller_endpoint,
-                    root_invite_headers: SIP.Parser.ParseHeaders(msg.headers)
+                    root_invite_headers: SIP.Parser.ParseHeaders(msg.headers),
+                    root_invite_body: msg.body,
                 })
             }else{
                 this.server_send(this.response({

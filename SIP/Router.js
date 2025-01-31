@@ -33,9 +33,7 @@ class Router{
     }
 
     route(desired_endpoint){
-        console.log({desired_endpoint})
         var ret = null;
-
         for(var route in this.routes){
             if(desired_endpoint.match(this.routes[route].match)){
                 ret = {...this.routes[route]}
@@ -43,10 +41,7 @@ class Router{
                 ret.endpoint =  ret.endpoint_type.manager.items[ret.endpoint];
             }
         }
-
         return ret;
-
-
     }
 }
 
