@@ -100,10 +100,11 @@ class VOIP{
             behavior: (props) => {
                 console.log('IVR BEHAVIOR')        
                 let h = {...props.root_invite_headers};
-                h.From = props.root_invite_headers.To;
-                h.From.contact.username = `IVR ${props.callee_endpoint.endpoint.name}`;
-                h.From.tag = props.root_invite_headers.From.tag;
-                h.To = props.root_invite_headers.From;
+                //h.From = props.root_invite_headers.To;
+                //h.From.contact.username = `IVR ${props.callee_endpoint.endpoint.name}`;
+                //h.From.tag = props.root_invite_headers.From.tag;
+                //h.To = props.root_invite_headers.From;
+                
                 this.server_send(this.response({
                     isResponse: true,
                     statusCode: 200,
@@ -123,10 +124,24 @@ class VOIP{
                             a=fmtp:101 0-16
                             a=sendrecv
                             a=rtcp-mux`.replace(/^[ \t]+/gm, '')
-                }),h.Contact.contact.ip, h.Contact.contact.port)
+                }),h.Contact.contact.ip, h.Contact.contact.port, (d) => {
+                    console.log('IVR RESPONSE CALLBACK')
+                    console.log(d)
+                    let parsed_headers = SIP.Parser.ParseHeaders(d.headers);
+                    if(d.method == 'BYE'){
+                        console.log('IVR BYE')
+                        this.server_send(this.response({
+                            isResponse: true,
+                            statusCode: 200,
+                            statusText: 'OK',
+                            headers: parsed_headers,
+                        }), parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
+                        //this.IVRManager.items[props.callee_endpoint.endpoint.name].stop_stream(parsed_headers['Call-ID'])
+                    }
+                })
 
 
-                this.IVRManager.items[props.callee_endpoint.endpoint.name].start_stream(props.root_invite_body)
+                this.IVRManager.items[props.callee_endpoint.endpoint.name].start_stream(h['Call-ID'], props.root_invite_body)
 
             }
         })
@@ -165,8 +180,10 @@ class VOIP{
             }
             var tag = SIP.Parser.ParseHeaders(res.headers).From.tag;
             var branch = SIP.Parser.ParseHeaders(res.headers).Via.branch;
+            var call_id = SIP.Parser.ParseHeaders(res.headers)['Call-ID'];
             let check_for_callbacks = (tag, branch) => {
-                let mg = [].concat.apply([], Object.entries(this.message_stack[branch]).map((d => d[1]))).filter((d) => d.sent == true)
+                //et mg = [].concat.apply([], Object.entries(this.message_stack[branch]).map((d => d[1]))).filter((d) => d.sent == true)
+                let mg = this.message_stack[call_id].filter((d) => d.sent == true)
                 if(mg.length == 0){
                     return;
                 }
@@ -184,13 +201,20 @@ class VOIP{
                 return c
             }
 
-            if(this.message_stack[branch] == undefined){
-                this.message_stack[branch] = {};
-            }
-            if(this.message_stack[branch][tag] == undefined){
-                this.message_stack[branch][tag] = [];
-            }
-            this.message_stack[branch][tag].push({message:res, sent: false})
+            //if(this.message_stack[branch] == undefined){
+            //    this.message_stack[branch] = {};
+            //}
+            //if(this.message_stack[branch][tag] == undefined){
+            //    this.message_stack[branch][tag] = [];
+            //}
+            //this.message_stack[branch][tag].push({message:res, sent: false})
+            if(this.message_stack[call_id] == undefined){
+                this.message_stack[call_id] = [];
+            };
+
+            this.message_stack[call_id].push({message:res, sent: false})
+
+
             let cb = check_for_callbacks(tag, branch);
             if(cb == undefined){
                 console.log('no callback')
@@ -218,13 +242,18 @@ class VOIP{
         this.transport.send(built, ip, port)
         var tag = SIP.Parser.ParseHeaders(message.headers).From.tag;
         var branch = SIP.Parser.ParseHeaders(message.headers).Via.branch;
-        if(!this.message_stack[branch]){
-            this.message_stack[branch] = {};
-            this.message_stack[branch][tag] = [];
-        }else if(this.message_stack[branch][tag] == undefined){
-            this.message_stack[branch][tag] = [];
+        var call_id = SIP.Parser.ParseHeaders(message.headers)['Call-ID'];
+        //if(!this.message_stack[branch]){
+        //    this.message_stack[branch] = {};
+        //    this.message_stack[branch][tag] = [];
+        //}else if(this.message_stack[branch][tag] == undefined){
+        //    this.message_stack[branch][tag] = [];
+        //}
+        if(this.message_stack[call_id] == undefined){
+            this.message_stack[call_id] = [];
         }
-        this.message_stack[branch][tag].push({message, callback: msg_callback, sent: true})
+        //this.message_stack[branch][tag].push({message, callback: msg_callback, sent: true})
+        this.message_stack[call_id].push({message, callback: msg_callback, sent: true})
     }
 
     send(message, msg_callback){
@@ -232,13 +261,18 @@ class VOIP{
         this.transport.send(built, this.register_ip, this.register_port)
         var tag = SIP.Parser.ParseHeaders(message.headers).From.tag;
         var branch = SIP.Parser.ParseHeaders(message.headers).Via.branch;
-        if(!this.message_stack[branch]){
-            this.message_stack[branch] = {};
-            this.message_stack[branch][tag] = [];
-        }else if(this.message_stack[branch][tag] == undefined){
-            this.message_stack[branch][tag] = [];
+        var call_id = SIP.Parser.ParseHeaders(message.headers)['Call-ID'];
+        //if(!this.message_stack[branch]){
+        //    this.message_stack[branch] = {};
+        //    this.message_stack[branch][tag] = [];
+        //}else if(this.message_stack[branch][tag] == undefined){
+        //    this.message_stack[branch][tag] = [];
+        //}
+        if(this.message_stack[call_id] == undefined){
+            this.message_stack[call_id] = [];
         }
-        this.message_stack[branch][tag].push({message, callback: msg_callback, sent: true})
+        //this.message_stack[branch][tag].push({message, callback: msg_callback, sent: true})
+        this.message_stack[call_id].push({message, callback: msg_callback, sent: true})
     }
 
     uac_responses(msg, client_callback){
