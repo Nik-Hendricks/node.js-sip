@@ -54,12 +54,60 @@ class IVRManager{
             }
         })
 
+        console.log('codecs')
+        console.log(codecs)
+
         let selected_codec = codecs[0]
         if(selected_codec.name == 'telephone-event'){
             selected_codec = codecs[1]
+            console.log(selected_codec)
         }
+
+        //see if opus is available
+        codecs.forEach(codec => {
+            if(codec.name == 'opus'){
+                selected_codec = codec;
+            }
+        })
+
+        if(selected_codec.name != 'opus'){
+            //check if g729 is available
+            codecs.forEach(codec => {
+                if(codec.name == 'G729'){
+                    selected_codec = codec;
+                }
+            })
+        }
+
+
         console.log('selected_codec')
         console.log(selected_codec)
+
+        //convert audio file to the codec that the call is using
+
+        //let convertArgs = [
+        //    '-i', 'song.mp3',
+        //    '-acodec', ffmpeg_codec_map[selected_codec.name],
+        //    '-ar', selected_codec.rate,
+        //    '-ac', selected_codec.channels,
+        //    'song.wav'
+        //];
+//
+        //let convert = spawn('ffmpeg', convertArgs);
+//
+        //convert.stdout.on('data', (data) => {
+        //    console.log(`stdout: ${data}`);
+        //});
+//
+        //convert.stderr.on('data', (data) => {
+        //    console.error(`stderr: ${data}`);
+        //});
+//
+        //convert.on('close', (code) => {
+        //    console.log(`child process exited with code ${code}`);
+        //});
+
+
 
         let spawn = require('child_process').spawn;
         let ffmpegArgs = [

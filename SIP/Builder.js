@@ -36,9 +36,9 @@ const Builder = {
             protocol: "SIP/2.0",
             headers: {
                 'Via': `SIP/2.0/UDP ${utils.getLocalIpAddress()}:${props.remote_port};branch=${props.branchId}`,
-                'From': `<sip:${props.username}@${utils.getLocalIpAddress()}>;tag=${props.from_tag || Math.floor(Math.random() * 10000000000000)}`,
+                'From': `<sip:${props.username}@${utils.getLocalIpAddress()}>;tag=${props.from_tag}`, //|| SIP.Builder.generateTag()}`,
                 'To': `<sip:${props.to}@${props.ip}>`,
-                'Call-ID': `${props.callId}@${utils.getLocalIpAddress()}`,
+                'Call-ID': props.callId, //(props.callId !== undefined) ? props.callId : SIP.Builder.generateBranch(),
                 'CSeq': `${props.cseq} ${props.cseq_method || method.toUpperCase()}`,
                 'Contact': `<sip:${props.username}@${utils.getLocalIpAddress()}:${[props.remote_port]}>`,
                 'Max-Forwards': Builder.max_forwards,

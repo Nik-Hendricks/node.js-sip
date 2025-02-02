@@ -63,34 +63,42 @@ class VOIP{
             manager: this.UserManager,
             behavior: (props) => {
                 console.log('EXTENSION BEHAVIOR')
-                //console.log(props)
-
                 let final_ep = props.callee_endpoint;
                 let caller_final_ep = props.caller_endpoint;
-                this.internal_uac.uac_init_call({username:props.caller_endpoint.endpoint.extension, to: props.callee_endpoint.endpoint.extension, ip: props.callee_endpoint.endpoint.ip, port: props.callee_endpoint.endpoint.port, client_callback: (root_response) => {
-                    let root_response_headers = SIP.Parser.ParseHeaders(root_response.message.headers);
-                    let m = root_response.message;
-                    m.headers = SIP.Parser.ParseHeaders(m.headers);
-                    m.headers.Via.branch = props.root_invite_headers.Via.branch;
-                    m.headers.From.tag = props.root_invite_headers.From.tag;
-                    console.log("INTERNAL UAC CALLBACK")
-                    this.server_send(this.response(m), props.caller_endpoint.endpoint.ip, props.caller_endpoint.endpoint.port)
-                    if(root_response.type == 200){
-                        let ack_headers = props.root_invite_headers;
-                        ack_headers.Via.branch = root_response_headers.Via.branch;
-                        ack_headers.From.tag = root_response_headers.From.tag;
-                        this.internal_uac.server_send(this.internal_uac.response({
-                            isResponse: false,
-                            method: 'ACK',
-                            headers: ack_headers,
-                            requestUri: `sip:${ack_headers.To.contact.username}@${ack_headers.Via.uri.ip}:${ack_headers.Via.uri.port}`,
-                            sdp: root_response.message.body
-                        }), props.callee_endpoint.endpoint.ip, props.callee_endpoint.endpoint.port, (d) => {
-                            console.log('ACK CALLBACK') 
-                            console.log(d)
+                this.internal_uac.uac_init_call({
+                    username:props.caller_endpoint.endpoint.extension,
+                    to: props.callee_endpoint.endpoint.extension,
+                    branch: props.root_invite_headers.Via.branch,
+                    from_tag: props.root_invite_headers.From.tag,
+                    callId: props.root_invite_headers['Call-ID'],
+                    ip: props.callee_endpoint.endpoint.ip,
+                    port: props.callee_endpoint.endpoint.port,
+                    sdp: props.root_invite_body,
+                    client_callback: (root_response) => {
+                        let m = {...root_response.message};
+                        m.headers = SIP.Parser.ParseHeaders(m.headers);
+                        this.server_send(this.response(m), props.caller_endpoint.endpoint.ip, props.caller_endpoint.endpoint.port, (d) => {
+                            console.log('call client callback 1')
+                            let m = {...d};
+                            m.headers = SIP.Parser.ParseHeaders(m.headers);
+                            m.body = props.root_invite_body;
+                            this.internal_uac.server_send(this.response(m), props.callee_endpoint.endpoint.ip, props.callee_endpoint.endpoint.port, (d) => {
+                                let m = {...d};
+                                m.headers = SIP.Parser.ParseHeaders(m.headers);
+                                console.log('INTERNAL UAC RESPONSE CALLBACK')
+                                console.log(m)
+                                this.server_send(this.response(m), props.caller_endpoint.endpoint.ip, props.caller_endpoint.endpoint.port, (d) => {
+                                    console.log('call client callback 2')
+                                    console.log(d)
+                                    this.internal_uac.server_send(this.response(m), props.callee_endpoint.endpoint.ip, props.callee_endpoint.endpoint.port, (d) => {
+                                        console.log('INTERNAL UAC RESPONSE CALLBACK')
+                                        console.log(d)
+                                    })
+                                })
+                            })
                         })
                     }
-                }})
+                })
             }
         })
 
@@ -100,11 +108,7 @@ class VOIP{
             behavior: (props) => {
                 console.log('IVR BEHAVIOR')        
                 let h = {...props.root_invite_headers};
-                //h.From = props.root_invite_headers.To;
-                //h.From.contact.username = `IVR ${props.callee_endpoint.endpoint.name}`;
-                //h.From.tag = props.root_invite_headers.From.tag;
-                //h.To = props.root_invite_headers.From;
-                
+                h.From.contact.username = `${props.callee_endpoint.endpoint.name}`;
                 this.server_send(this.response({
                     isResponse: true,
                     statusCode: 200,
@@ -458,25 +462,17 @@ class VOIP{
     uac_init_call(props){
         var cseq = 1;
         var try_count = 0;
-        var sdp = `v=0
-        o=- 123456789 123456789 IN IP4 ${utils.getLocalIpAddress()}
-        s=node.js-sip Call
-        c=IN IP4 ${utils.getLocalIpAddress()}
-        t=0 0
-        m=audio 5005 RTP/AVP 8
-        a=rtpmap:8 PCMA/8000
-        a=fmtp:8 0-15`.replace(/^[ \t]+/gm, '');
 
         let h = {
             to: props.to,
             ip: props.ip || this.register_ip,
             port: props.port,
             username: props.username,
-            callId: SIP.Builder.generateBranch(),
+            callId: props.callId, //|| SIP.Builder.generateBranch(),
             cseq: cseq,
-            branchId: SIP.Builder.generateBranch(),
-            from_tag: SIP.Builder.generateTag(),
-            body: sdp,
+            branchId: props.branch,// || SIP.Builder.generateBranch(),
+            from_tag: props.from_tag,// || SIP.Builder.generateTag(),
+            body: props.sdp,
             password: this.register_password,
             requestUri: `sip:${props.to}@${props.ip}:${props.port}`,
             remote_port: this.transport.port,
@@ -684,7 +680,7 @@ class VOIP{
             protocol: 'SIP/2.0',
             headers: {
                 'Via': `SIP/2.0/UDP ${props.headers.Via.uri.ip}:${props.headers.Via.uri.port || 5060};branch=${props.headers.Via.branch}`,
-                'To': `<sip:${props.headers.To.contact.username}@${props.headers.Via.uri.ip}:${props.headers.Via.uri.port || 5060}>`,
+                'To': `<sip:${props.headers.To.contact.username}@${props.headers.Via.uri.ip}:${props.headers.Via.uri.port || 5060}>${(props.headers.To.tag) ? `;tag=${props.headers.To.tag}` : ``}`,
                 'From': `<sip:${props.headers.From.contact.username}@${this.transport.ip}:${this.transport.port}>;tag=${props.headers.From.tag}`,
                 'Call-ID': props.headers['Call-ID'],
                 'CSeq': `${props.headers.CSeq.count} ${props.headers.CSeq.method}`,
