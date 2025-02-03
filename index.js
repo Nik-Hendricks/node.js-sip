@@ -50,7 +50,7 @@ class VOIP{
                 console.log('TRUNK BEHAVIOR')
                 console.log(d)
                 let final_ep = this.TrunkManager.items[endpoint.endpoint];
-                this.accept(msg, SIP.Parser.parse(msg.toString()).body, client_callback)
+                //this.accept(msg, SIP.Parser.parse(msg.toString()).body, client_callback)
                 final_ep.uac.call({username:caller, to: callee, ip: final_ep.uac.register_ip, port: final_ep.uac.register_port, client_callback: (d) => {
                     console.log('call callback')
                     console.log(d)
@@ -78,24 +78,10 @@ class VOIP{
                         let m = {...root_response.message};
                         m.headers = SIP.Parser.ParseHeaders(m.headers);
                         this.server_send(this.response(m), props.caller_endpoint.endpoint.ip, props.caller_endpoint.endpoint.port, (d) => {
-                            console.log('call client callback 1')
                             let m = {...d};
                             m.headers = SIP.Parser.ParseHeaders(m.headers);
                             m.body = props.root_invite_body;
-                            this.internal_uac.server_send(this.response(m), props.callee_endpoint.endpoint.ip, props.callee_endpoint.endpoint.port, (d) => {
-                                let m = {...d};
-                                m.headers = SIP.Parser.ParseHeaders(m.headers);
-                                console.log('INTERNAL UAC RESPONSE CALLBACK')
-                                console.log(m)
-                                this.server_send(this.response(m), props.caller_endpoint.endpoint.ip, props.caller_endpoint.endpoint.port, (d) => {
-                                    console.log('call client callback 2')
-                                    console.log(d)
-                                    this.internal_uac.server_send(this.response(m), props.callee_endpoint.endpoint.ip, props.callee_endpoint.endpoint.port, (d) => {
-                                        console.log('INTERNAL UAC RESPONSE CALLBACK')
-                                        console.log(d)
-                                    })
-                                })
-                            })
+                            this.internal_uac.server_send(this.response(m), props.callee_endpoint.endpoint.ip, props.callee_endpoint.endpoint.port);
                         })
                     }
                 })
@@ -117,7 +103,7 @@ class VOIP{
                     body:  `v=0
                             o=Z 0 177241510 IN IP4 192.168.1.12
                             s=Z
-                            c=IN IP4 192.168.1.143
+                            c=IN IP4 192.168.1.12
                             t=0 0
                             m=audio 5050 RTP/AVP 106 9 98 101 0 8 3
                             a=rtpmap:106 opus/48000/2
@@ -140,13 +126,14 @@ class VOIP{
                             statusText: 'OK',
                             headers: parsed_headers,
                         }), parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
-                        //this.IVRManager.items[props.callee_endpoint.endpoint.name].stop_stream(parsed_headers['Call-ID'])
+                        this.IVRManager.items[props.callee_endpoint.endpoint.name].stop_stream(parsed_headers['Call-ID'])
                     }
                 })
-
-
-                this.IVRManager.items[props.callee_endpoint.endpoint.name].start_stream(h['Call-ID'], props.root_invite_body)
-
+                this.IVRManager.items[props.callee_endpoint.endpoint.name].start_stream(props.root_invite_headers['Call-ID'], props.root_invite_body)
+                this.IVRManager.items[props.callee_endpoint.endpoint.name].handle_dtmf(props.root_invite_headers['Call-ID'], (d) => {
+                    console.log('DTMF CALLBACK')
+                    console.log(d)
+                })
             }
         })
         

@@ -1,7 +1,9 @@
+const fs = require('fs');
+const { spawn } = require('child_process');
+
 class IVRManager{
     constructor(){
         this.items = {};
-        this.rtp_streams = {};
     }
 
     addIVR(props){
@@ -17,10 +19,13 @@ class IVRManager{
         return {
             name: String(props.name),
             start_stream: this.start_stream,
+            stop_stream: this.stop_stream,
+            handle_dtmf: this.handle_dtmf,
+            streams: [],
         }
     }
 
-    start_stream(call_id, sdp){
+    start_stream(call_id, sdp, dtmf_callback){
         console.log('Starting Stream')
         let port = sdp.match(/m=audio (\d+) RTP/)[1];
         let ip = sdp.match(/c=IN IP4 (\d+\.\d+\.\d+\.\d+)/)[1];
@@ -83,33 +88,6 @@ class IVRManager{
         console.log('selected_codec')
         console.log(selected_codec)
 
-        //convert audio file to the codec that the call is using
-
-        //let convertArgs = [
-        //    '-i', 'song.mp3',
-        //    '-acodec', ffmpeg_codec_map[selected_codec.name],
-        //    '-ar', selected_codec.rate,
-        //    '-ac', selected_codec.channels,
-        //    'song.wav'
-        //];
-//
-        //let convert = spawn('ffmpeg', convertArgs);
-//
-        //convert.stdout.on('data', (data) => {
-        //    console.log(`stdout: ${data}`);
-        //});
-//
-        //convert.stderr.on('data', (data) => {
-        //    console.error(`stderr: ${data}`);
-        //});
-//
-        //convert.on('close', (code) => {
-        //    console.log(`child process exited with code ${code}`);
-        //});
-
-
-
-        let spawn = require('child_process').spawn;
         let ffmpegArgs = [
             '-re',
             '-i', 'song.mp3',
@@ -121,6 +99,7 @@ class IVRManager{
         ];
 
         let ffmpeg = spawn('ffmpeg', ffmpegArgs);
+        this.streams[call_id] = ffmpeg;
 
         ffmpeg.stdout.on('data', (data) => {
             console.log(`stdout: ${data}`);
@@ -128,10 +107,66 @@ class IVRManager{
         ffmpeg.stderr.on('data', (data) => {
             console.error(`stderr: ${data}`);
         });
+    }
 
+    stop_stream(call_id){
+        console.log('Stopping Stream')  
+        this.streams[call_id].kill('SIGINT');
+        delete this.streams[call_id];
+    }
 
+    handle_dtmf(call_id, callback) {
+        const outputAudioFile = "rtp_audio.wav";
 
-
+        console.log("Starting FFmpeg RTP capture...");
+    
+        //const ffmpeg = spawn("ffmpeg", [
+        //    "-protocol_whitelist", "file,rtp,udp",
+        //    "-i", "rtp://192.168.1.12:5050",
+        //    "-vn", "-acodec", "pcm_s16le", "-ar", "8000", "-ac", "1", outputAudioFile
+        //]);
+        const ffmpeg = spawn("ffmpeg", [
+            "-protocol_whitelist", "file,udp,rtp",
+            "-i", 'stream.sdp',
+            "-vn", "-acodec", "pcm_s16le", "-ar", "8000", "-ac", "1", outputAudioFile
+        ]);
+    
+        ffmpeg.stderr.on("data", (data) => {
+            console.log(`FFmpeg: ${data.toString()}`);
+        });
+    
+        ffmpeg.on("close", () => {
+            console.log("FFmpeg finished recording. Analyzing audio...");
+    
+            const sox = spawn("sox", [outputAudioFile, "-n", "stat"]);
+    
+            let soxOutput = "";
+            sox.stderr.on("data", (data) => {
+                soxOutput += data.toString();
+            });
+    
+            sox.on("close", () => {
+                // Extract detected frequency
+                const match = soxOutput.match(/Frequency:\s+(\d+\.\d+)/);
+                if (match) {
+                    const detectedFreq = parseFloat(match[1]);
+                    const dtmfMapping = {
+                        "697": "1", "770": "4", "852": "7", "941": "*",
+                        "697,1209": "2", "770,1209": "5", "852,1209": "8", "941,1209": "0",
+                        "697,1336": "3", "770,1336": "6", "852,1336": "9", "941,1336": "#",
+                        "697,1477": "A", "770,1477": "B", "852,1477": "C", "941,1477": "D"
+                    };
+    
+                    Object.entries(dtmfMapping).forEach(([freq, digit]) => {
+                        if (freq.includes(detectedFreq.toFixed(0))) {
+                            console.log(`In-band DTMF detected: ${digit}`);
+                            callback(digit);
+                        }
+                    });
+                }
+                fs.unlinkSync(outputAudioFile); // Cleanup
+            });
+        });
     }
 }
 
