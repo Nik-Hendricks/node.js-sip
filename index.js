@@ -52,11 +52,8 @@ class VOIP{
                 console.log('TRUNK BEHAVIOR')
                 console.log(d)
                 let final_ep = this.TrunkManager.items[endpoint.endpoint];
-                //this.accept(msg, SIP.Parser.parse(msg.toString()).body, client_callback)
-                final_ep.uac.call({username:caller, to: callee, ip: final_ep.uac.register_ip, port: final_ep.uac.register_port, client_callback: (d) => {
-                    console.log('call callback')
-                    console.log(d)
-                }})
+
+
             }
         })
 
@@ -102,6 +99,7 @@ class VOIP{
                     sdp: props.root_invite_body,
                     callback: (d) => {
                         if(d.type == 'SESSION_STARTED'){
+                            h['Content-Type'] = 'application/sdp';
                             this.server_send(this.response({
                                 isResponse: true,
                                 statusCode: 200,
@@ -270,19 +268,25 @@ class VOIP{
         var type = res.method || res.statusCode;
         if(type == 'NOTIFY'){
             console.log('uac_responses > NOTIFY')
+            let h =  SIP.Parser.ParseHeaders(res.headers)
+            delete h['Content-Length']
+            delete h['Content-Type']
             this.send(this.response({   
                 isResponse: true,
                 statusCode: 200,
                 statusText: 'OK',
-                headers: SIP.Parser.ParseHeaders(res.headers)
+                headers: h
             }))  
         }else if (type == 'INFO') {
             console.log('uac_responses > INFO')
+            let h =  SIP.Parser.ParseHeaders(res.headers)
+            delete h['Content-Length']
+            delete h['Content-Type']
             this.send(this.response({   
                 isResponse: true,
                 statusCode: 200,
                 statusText: 'OK',
-                headers: SIP.Parser.ParseHeaders(res.headers)
+                headers: h
             }))  
         }else if (type == 'INVITE') {
             console.log('uac_responses > INVITE')
@@ -375,6 +379,39 @@ class VOIP{
             }), root_invite_headers.Contact.contact.ip, root_invite_headers.Contact.contact.port)
 
         }
+    }
+
+    uas_handle_subscribe(msg, client_callback){
+        console.log('uas_handle_subscribe')
+        let parsed_headers = SIP.Parser.ParseHeaders(msg.headers);
+        this.server_send(this.response({
+            isResponse: true,
+            statusCode: 200,
+            statusText: 'OK',
+            headers: parsed_headers,
+        }), parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
+
+
+        setTimeout(() => {
+            //send NOTIFY with fake voice mail
+            let body = `Voice-Mail: 1/1 (0/0)`;
+            this.server_send(this.response({
+                isResponse: false,
+                method: 'NOTIFY',
+                requestUri: `${parsed_headers.Contact.contact.username}@${parsed_headers.Contact.contact.ip}:${parsed_headers.Contact.contact.port}`,
+                headers: {
+                    ...parsed_headers,
+                    'Event': 'message-summary',
+                    'Subscription-State': 'active',
+                    'Content-Type': 'application/simple-message-summary',
+                    'Content-Length': '0',
+                },
+                body: body
+            }), parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
+        }, 5000)
+
+
+
     }
 
     register(props, client_callback){
@@ -496,127 +533,6 @@ class VOIP{
         sendInvite();
     }
 
-    call(props){
-        var cseq = 1;
-        var try_count = 0;
-        var sdp = `v=0
-        o=- 123456789 123456789 IN IP4 ${utils.getLocalIpAddress()}
-        s=node.js-sip Call
-        c=IN IP4 ${utils.getLocalIpAddress()}
-        t=0 0
-        m=audio 5005 RTP/AVP 8
-        a=rtpmap:8 PCMA/8000
-        a=fmtp:8 0-15`.replace(/^[ \t]+/gm, '');
-
-        let h = {
-            to: props.to,
-            ip: props.ip || this.register_ip,
-            port: props.port,
-            username: props.username,
-            callId: SIP.Builder.generateBranch(),
-            cseq: cseq,
-            branchId: SIP.Builder.generateBranch(),
-            from_tag: SIP.Builder.generateTag(),
-            body: sdp,
-            password: this.register_password,
-            requestUri: `sip:${props.to}@${props.ip}:${props.port}`,
-            remote_port: this.transport.port,
-        };
-
-        const sendInvite = (challenge_headers, proxy_auth = false) => {
-            try_count++;
-            if(try_count > this.max_retries){
-                console.log('Max retries reached');
-                props.client_callback({type:'CALL_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
-                return;
-            }
-
-            
-            let inv_responses = (response) => {
-                if(response.statusCode == 400){
-                    console.log('400 Bad Request');
-                    return;
-                }else if (response.statusCode == 401 || response.statusCode == 407) {
-                    let challenge_data = (response.statusCode == 401) ? SIP.Parser.ParseHeaders(response.headers)['WWW-Authenticate'] : SIP.Parser.ParseHeaders(response.headers)['Proxy-Authenticate'];
-                    sendInvite(challenge_data, false);
-                }else if (response.statusCode == 100) {
-                    console.log('100 Trying');
-                    return;
-                }else if (response.statusCode == 403) {
-                    console.log('403 Forbidden');
-                    props.client_callback({type:'CALL_REJECTED', message:response});
-                    return;
-                }else if (response.statusCode == 486) {
-                    console.log('486 Busy Here');
-                    props.client_callback({type:'CALL_BUSY', message:response});
-                    return;
-                }else if (response.statusCode == 183) {
-                    console.log('183 Session Progress');
-                    return
-                }else if (response.statusCode == 200) {
-                    if(this.server_uac == true){
-                        this.server_send(this.response({   
-                            isResponse: true,
-                            statusCode: 200,
-                            statusText: 'OK',
-                            headers: SIP.Parser.ParseHeaders(response.headers)
-                        }), h.ip, h.port)
-                    }else{
-                        this.send(this.response({   
-                            isResponse: true,
-                            statusCode: 200,
-                            statusText: 'OK',
-                            headers: SIP.Parser.ParseHeaders(response.headers)
-                        }))
-                    }
-                    props.client_callback({type:'CALL_CONNECTED', message:response, sdp: response.body});
-                    return;
-                }else if (response.isResponse == false && response.method == 'BYE') {
-                    console.log('BYE Received');
-                    let res = this.response({   
-                        isResponse: true,
-                        statusCode: 200,
-                        statusText: 'OK',
-                        headers: SIP.Parser.ParseHeaders(response.headers)
-                    })
-                    if(this.server_uac == true){
-                        this.server_send(res, h.ip, h.port)
-                    }else{
-                        this.send(res)  
-                    }
-
-                    return;
-                }else if(response.isResponse == false && response.method == 'INFO'){
-                    console.log('INFO Received');
-                    console.log(response.body)
-                    this.send(this.response({   
-                        isResponse: true,
-                        statusCode: 200,
-                        statusText: 'OK',
-                        headers: SIP.Parser.ParseHeaders(res.headers)
-                    }))  
-                    return;
-                }else {
-                    console.error('Unexpected status code:', response.statusCode);
-                }
-            }
-
-            let inv_message = SIP.Builder.SIPMessageObject('INVITE', h, challenge_headers, proxy_auth);
-
-            if(this.server_uac == true){
-                this.server_send(inv_message, h.ip, h.port, (response) => {
-                    inv_responses(response)
-                });
-            }else{
-                this.send(inv_message, (response) => {
-                    inv_responses(response)
-                });
-            }
-        };
-        
-        sendInvite();
-    }
-
     response(props){
         let nonce = SIP.Builder.generateChallengeNonce();
         let opaque = SIP.Builder.generateChallengeOpaque();
@@ -641,10 +557,13 @@ class VOIP{
             body: props.body || ''
         }   
 
-        if(props.body !== '' && props.body !== undefined){
-            ret.headers['Content-Length'] = props.body.length;
-            ret.headers['Content-Type'] = 'application/sdp';
+        if(props.headers['Content-Type']){
+            ret.headers['Content-Type'] = props.headers['Content-Type'];
+            if(props.body){
+                ret.headers['Content-Length'] = props.body.length;
+            }
         }
+
 
         if(props.auth_required == true){
             ret.headers['WWW-Authenticate'] = `Digest realm="node.js-sip",nonce="${nonce}",opaque="${opaque}",algorithm=md5,qop="auth"`
