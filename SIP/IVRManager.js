@@ -2,7 +2,8 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 
 class IVRManager{
-    constructor(){
+    constructor(VOIP){
+        this.VOIP = VOIP;
         this.items = {};
     }
 

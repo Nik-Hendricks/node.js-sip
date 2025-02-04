@@ -2,6 +2,7 @@
 const SIP = require('./SIP')
 const utils = require('./utils')
 const SDPParser = require('./SDP')
+const RTP = require('./RTP')
 
 class VOIP{
     constructor(props, callback){
@@ -14,6 +15,7 @@ class VOIP{
             port: props.transport.port || Math.floor(Math.random() * 65535) + 1,
             ip: utils.getLocalIpAddress(),
         });
+        this.SessionManager = new RTP.SessionManager();
         this.utils = utils;
         this.message_stack = {};
         this.type = props.type;
@@ -26,8 +28,8 @@ class VOIP{
         
     UAS(props, callback){
         this.TrunkManager = new SIP.TrunkManager(VOIP); //need to pass the VOIP class through so that new UACs can be created as the Trunks.
-        this.UserManager = new SIP.UserManager();
-        this.IVRManager = new SIP.IVRManager();
+        this.UserManager = new SIP.UserManager(VOIP);
+        this.IVRManager = new SIP.IVRManager(VOIP);
         this.Router = props.Router || new SIP.Router({context: this});
         this.internal_uac = new VOIP({
             type:'client',
@@ -95,45 +97,40 @@ class VOIP{
                 console.log('IVR BEHAVIOR')        
                 let h = {...props.root_invite_headers};
                 h.From.contact.username = `${props.callee_endpoint.endpoint.name}`;
-                this.server_send(this.response({
-                    isResponse: true,
-                    statusCode: 200,
-                    statusText: 'OK',
-                    headers: h,
-                    body:  `v=0
-                            o=Z 0 177241510 IN IP4 192.168.1.12
-                            s=Z
-                            c=IN IP4 192.168.1.12
-                            t=0 0
-                            m=audio 5050 RTP/AVP 106 9 98 101 0 8 3
-                            a=rtpmap:106 opus/48000/2
-                            a=fmtp:106 sprop-maxcapturerate=16000; minptime=20; useinbandfec=1
-                            a=rtpmap:98 telephone-event/48000
-                            a=fmtp:98 0-16
-                            a=rtpmap:101 telephone-event/8000
-                            a=fmtp:101 0-16
-                            a=sendrecv
-                            a=rtcp-mux`.replace(/^[ \t]+/gm, '')
-                }),h.Contact.contact.ip, h.Contact.contact.port, (d) => {
-                    console.log('IVR RESPONSE CALLBACK')
-                    console.log(d)
-                    let parsed_headers = SIP.Parser.ParseHeaders(d.headers);
-                    if(d.method == 'BYE'){
-                        console.log('IVR BYE')
-                        this.server_send(this.response({
-                            isResponse: true,
-                            statusCode: 200,
-                            statusText: 'OK',
-                            headers: parsed_headers,
-                        }), parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
-                        this.IVRManager.items[props.callee_endpoint.endpoint.name].stop_stream(parsed_headers['Call-ID'])
+                let s = this.SessionManager.new_session({
+                    call_id: props.root_invite_headers['Call-ID'],
+                    sdp: props.root_invite_body,
+                    callback: (d) => {
+                        if(d.type == 'SESSION_STARTED'){
+                            this.server_send(this.response({
+                                isResponse: true,
+                                statusCode: 200,
+                                statusText: 'OK',
+                                headers: h,
+                                body:  s.listen_sdp
+                            }),h.Contact.contact.ip, h.Contact.contact.port, (d) => {
+                                console.log('IVR RESPONSE CALLBACK')
+                                console.log(d)
+                                let parsed_headers = SIP.Parser.ParseHeaders(d.headers);
+                                if(d.method == 'BYE'){
+                                    console.log('IVR BYE')
+                                    this.server_send(this.response({
+                                        isResponse: true,
+                                        statusCode: 200,
+                                        statusText: 'OK',
+                                        headers: parsed_headers,
+                                    }), parsed_headers.Contact.contact.ip, parsed_headers.Contact.contact.port)
+                                    s.stop();
+                                }
+                            })
+                        }else{
+                            console.log('SESSION CALLBACK ELSE')
+                            console.log(d)
+                        }
                     }
                 })
-                this.IVRManager.items[props.callee_endpoint.endpoint.name].start_stream(props.root_invite_headers['Call-ID'], props.root_invite_body)
-                this.IVRManager.items[props.callee_endpoint.endpoint.name].handle_dtmf(props.root_invite_headers['Call-ID'], (d) => {
-                    console.log('DTMF CALLBACK')
-                    console.log(d)
-                })
+
+                s.start();
             }
         })
         
@@ -620,41 +617,6 @@ class VOIP{
         sendInvite();
     }
 
-    reject(message){
-        var headers = SIP.Parser.ParseHeaders(message.headers);
-        console.log(headers)
-        headers.CSeq.count = headers.CSeq.count + 1;
-        var new_message = {
-            statusCode: '486 Busy Here',
-            isResponse: true,
-            protocol: 'SIP/2.0',
-            headers: {
-                'Via': `SIP/2.0/UDP ${headers.Via.uri.ip}:${headers.Via.uri.port || 5060};branch=${headers.Via.branch}`,
-                'To': `<sip:${headers.To.contact.username}>`,
-                'From': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>;tag=${headers.From.tag}`,
-                'Call-ID': headers['Call-ID'],
-                'CSeq': `${headers.CSeq.count} ${headers.CSeq.method}`,
-                'Contact': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>`,
-                'Max-Forwards': SIP.Builder.max_forwards,
-                'User-Agent': SIP.Builder.user_agent,
-                'Content-Length': '0',
-            },
-            body: ''
-        }
-        this.send(new_message)
-    }
-
-    bye(message){
-        var headers = SIP.Parser.ParseHeaders(message.headers);
-        message.isResponse = false;
-        message.method = 'BYE';
-        message.headers['Contact'] = `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>`
-        message.headers['To'] = `<sip:${headers.To.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>`
-        message.headers['From'] = `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>tag=${headers.From.tag}`
-        this.send(message)
-
-    }
-
     response(props){
         let nonce = SIP.Builder.generateChallengeNonce();
         let opaque = SIP.Builder.generateChallengeOpaque();
@@ -694,46 +656,6 @@ class VOIP{
 
         console.log(ret)
         return ret;
-
-    }
-
-    ack(message){
-        var headers = SIP.Parser.ParseHeaders(message.headers);
-        var new_message = {
-            isResponse: false,
-            protocol: 'SIP/2.0',
-            method: 'ACK',
-            requestUri: `sip:${headers.To.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}`,
-            headers: {
-                'Via': `SIP/2.0/UDP ${headers.Via.uri.ip}:${headers.Via.uri.port || 5060};branch=${headers.Via.branch}`,
-                'To': `<sip:${headers.To.contact.username}>@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}`,
-                'From': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>;tag=${headers.From.tag}`,
-                'Call-ID': headers['Call-ID'],
-                'CSeq': `${headers.CSeq.count} ${headers.CSeq.method}`,
-                'Contact': `<sip:${headers.From.contact.username}@${headers.Via.uri.ip}:${headers.Via.uri.port || 5060}>`,
-                'Max-Forwards': SIP.Builder.max_forwards,
-                'User-Agent': SIP.Builder.user_agent,
-            },
-            body: ''
-        }
-        this.send(new_message)
-    }
-
-    message(extension, body){
-        var headers = {
-            extension: extension,
-            ip: this.register_ip,
-            listen_ip: utils.getLocalIpAddress(),
-            listen_port: 5060,
-            username: this.username,
-            callId: SIP.Builder.generateBranch(),
-            cseq: 1,
-            branchId: SIP.Builder.generateBranch(),
-            body: body,
-        }
-
-       
-        this.send(SIP.Builder.SIPMessageObject('MESSAGE', headers))
 
     }
 }
