@@ -100,6 +100,7 @@ var v = new VOIP({
         console.log(d.message)
     }
 })
+```
 
 ## API Reference
 
