@@ -11,54 +11,58 @@ const utils = require("../utils");
 const Builder = {
     user_agent: "node-js-sip",
     max_forwards: 70,
-    /**
-    * Builds a SIP Message object.
-    *
-    * @param {Object} props - The properties object.
-    * @param {string} props.extension - The extension to call.
-    * @param {string} props.ip - The IP address to send the request to.
-    * @param {string} props.listen_ip - The IP address to listen on.
-    * @param {number} props.listen_port - The port to listen on.
-    * @param {string} props.branchId - The branch ID.
-    * @param {string} props.username - The username.
-    * @param {string} props.callId - The call ID.
-    * @param {number} props.cseq - The CSeq number.
-    * @param {string} props.body - The request body.
-    * @returns {Object} - The SIP INVITE request object.
-    */
 
-    SIPMessageObject: (method, props, challenge_data, proxy_auth = false) => {
-        console.log(props)
-
-        var res = {
-            method: method.toUpperCase(),
-            requestUri: props.requestUri,
-            protocol: "SIP/2.0",
+    SIPMessageObject: (props) => {
+        let nonce = Builder.generateChallengeNonce();
+        let opaque = Builder.generateChallengeOpaque();
+        let ret = {
+            isResponse: props.isResponse,
+            statusCode: (props.isResponse) ? props.statusCode : undefined,
+            statusText: (props.isResponse) ? props.statusText : undefined,
+            method: (props.isResponse) ? undefined : props.method,
+            requestUri: (props.isResponse) ? undefined : props.requestUri,
+            protocol: 'SIP/2.0',
             headers: {
-                'Via': `SIP/2.0/UDP ${utils.getLocalIpAddress()}:${props.remote_port};branch=${props.branchId}`,
-                'From': `<sip:${props.username}@${utils.getLocalIpAddress()}>;tag=${props.from_tag}`, //|| SIP.Builder.generateTag()}`,
-                'To': `<sip:${props.to}@${props.ip}>`,
-                'Call-ID': props.callId, //(props.callId !== undefined) ? props.callId : SIP.Builder.generateBranch(),
-                'CSeq': `${props.cseq} ${props.cseq_method || method.toUpperCase()}`,
-                'Contact': `<sip:${props.username}@${utils.getLocalIpAddress()}:${[props.remote_port]}>`,
+                'Via': `SIP/2.0/UDP ${props.headers.Via.uri.ip}:${props.headers.Via.uri.port};branch=${props.headers.Via.branch || Builder.generateBranch()}`,
+                'To': `<sip:${props.headers.To.contact.username}@${props.headers.To.contact.ip}${props.headers.To.contact.port ? `:${props.headers.To.contact.port}` : ''}>${(props.headers.To.tag) ? `;tag=${props.headers.To.tag}` : ``}`,
+                'From': `<sip:${props.headers.From.contact.username}@${props.headers.From.contact.ip}${props.headers.From.contact.port ? `:${props.headers.From.contact.port}` : ''}>;tag=${props.headers.From.tag || Builder.generateTag()}`,
+                'Call-ID': props.headers['Call-ID'] || `1-${props.headers.From.contact.username}-1@${props.headers.From.contact.ip}-${props.headers.From.contact.port}${Math.floor(Math.random() * 100000000)}`,
+                'CSeq': `${props.headers.CSeq.count} ${props.headers.CSeq.method}`,
                 'Max-Forwards': Builder.max_forwards,
                 'User-Agent': Builder.user_agent,
+                'Content-Length': '0',
             },
-            body: (typeof props.body !== 'undefined') ? props.body : ""
+            body: props.body || ''
+        }   
+        if(props.headers.Contact){
+            ret.headers.Contact = `<sip:${props.headers.Contact.contact.username}@${props.headers.Contact.contact.ip}:${props.headers.Contact.contact.port}>`
         }
 
-        if (challenge_data) {
-            var cnonce = Builder.generateBranch();
-            if(proxy_auth){
-                res.headers['Proxy-Authorization'] = `Digest username="${props.username}", realm="${challenge_data.realm}", nonce="${challenge_data.nonce}", uri="${res.requestUri}", response="${Builder.DigestResponse(props.username, props.password, challenge_data.realm, challenge_data.nonce, res.method, res.requestUri, challenge_data.qop, cnonce, '00000001')}", qop="${challenge_data.qop}", cnonce="${cnonce}", nc="00000001", algorithm="MD5"`;
-            }else{
-                res.headers['Authorization'] = `Digest username="${props.username}", realm="${challenge_data.realm}", nonce="${challenge_data.nonce}", uri="${res.requestUri}", response="${Builder.DigestResponse(props.username, props.password, challenge_data.realm, challenge_data.nonce, res.method, res.requestUri, challenge_data.qop, cnonce, '00000001')}", qop="${challenge_data.qop}", cnonce="${cnonce}", nc="00000001", algorithm="MD5"`;
+        if(props.headers['Content-Type']){
+            ret.headers['Content-Type'] = props.headers['Content-Type'];
+            if(props.body){
+                ret.headers['Content-Length'] = props.body.length;
             }
         }
-        
-        res.headers['Content-Length'] = res.body.length;
+        if (props.challenge_data) {
+            var cnonce = Builder.generateBranch();
+            if(props.proxy_auth == true){
+                ret.headers['Proxy-Authorization'] = `Digest username="${props.username}", realm="${props.challenge_data.realm}", nonce="${props.challenge_data.nonce}", uri="${ret.requestUri}", response="${Builder.DigestResponse(props.username, props.password, props.challenge_data.realm, props.challenge_data.nonce, ret.method, ret.requestUri, props.challenge_data.qop, cnonce, '00000001')}", qop="${props.challenge_data.qop}", cnonce="${cnonce}", nc="00000001", algorithm="MD5"`;
+            }else{
+                ret.headers['Authorization'] = `Digest username="${props.username}", realm="${props.challenge_data.realm}", nonce="${props.challenge_data.nonce}", uri="${ret.requestUri}", response="${Builder.DigestResponse(props.username, props.password, props.challenge_data.realm, props.challenge_data.nonce, ret.method, ret.requestUri, props.challenge_data.qop, cnonce, '00000001')}", qop="${props.challenge_data.qop}", cnonce="${cnonce}", nc="00000001", algorithm="MD5"`;
+            }
+        }
 
-        return res;
+        if(props.auth_required == true){
+            ret.headers['WWW-Authenticate'] = `Digest realm="node.js-sip",nonce="${nonce}",opaque="${opaque}",algorithm=md5,qop="auth"`
+        }
+
+        if(props.expires){
+            ret.headers.Contact = ret.headers.Contact + `;expires=${props.expires}`;
+        }
+
+        console.log(ret)
+        return ret;
     },
 
     Build(obj) {

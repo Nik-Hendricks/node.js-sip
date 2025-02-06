@@ -13,16 +13,17 @@ var v = new VOIP({
         port: 5060,
     },
     username:'1111',
-    register_password:'1234',
+    register_password:'rootPassword',
     register_ip:'192.168.1.12',
     register_port:5060,
     callId:'1234567890'
 }, (d) => {
     console.log(`client_test.js > d.type: ${d.type}`)
+    console.log(d)
     if(d.type == 'REGISTERED'){
         console.log(`REGISTERED`)
         v.uac_init_call({
-            to:'1001',
+            to:'1002',
             ip:'192.168.1.2',
             port:'5050',
             callId:call_id,
