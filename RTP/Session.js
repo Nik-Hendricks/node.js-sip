@@ -27,6 +27,7 @@ class Session{
         this.telephone_event_payload_types = new Set();
         this.dtmf_events = [];
         this.on_dtmf = null;
+        this.listen_bind_ip = props.listen_bind_ip || require('../utils').getLocalIpAddress();
         this._last_dtmf_end = null;
         if (typeof props.dtmf_callback === 'function') {
             this.on_dtmf = props.dtmf_callback;
@@ -62,7 +63,7 @@ class Session{
         };
 
         if (this.listen_ip && this.listen_port) {
-            this.rtp_socket.bind(this.listen_port, this.listen_ip, finishStart);
+            this.rtp_socket.bind(this.listen_port, this.listen_bind_ip, finishStart);
         } else {
             finishStart();
         }
@@ -192,6 +193,7 @@ class Session{
             received_bytes: this.received_bytes,
             last_packet_at: this.last_packet_at,
             listen_ip: this.listen_ip,
+            listen_bind_ip: this.listen_bind_ip,
             listen_port: this.listen_port,
         };
     }
