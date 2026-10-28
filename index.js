@@ -328,6 +328,19 @@ class VOIP{
         var tag = SIP.Parser.ParseHeaders(res.headers).From.tag;
         var branch = SIP.Parser.ParseHeaders(res.headers).Via.branch;
         var type = res.method || res.statusCode;
+        if(type == 'BYE'){
+            let h = SIP.Parser.ParseHeaders(res.headers);
+            delete h['Content-Length'];
+            delete h['Content-Type'];
+            this.send(SIP.Builder.SIPMessageObject({
+                isResponse: true,
+                statusCode: 200,
+                statusText: 'OK',
+                headers: h,
+            }));
+            client_callback({type:'BYE', message:res});
+            return;
+        }
         if(type == 'NOTIFY'){
             console.log('uac_responses > NOTIFY')
             let h =  SIP.Parser.ParseHeaders(res.headers)
@@ -863,6 +876,18 @@ class VOIP{
             let responses = (response) => {
                 if(response.statusCode == 400){
                     console.log('400 Bad Request');
+                    return;
+                }else if (response.method === 'BYE') {
+                    let h = SIP.Parser.ParseHeaders(response.headers);
+                    delete h['Content-Length'];
+                    delete h['Content-Type'];
+                    this.send(SIP.Builder.SIPMessageObject({
+                        isResponse: true,
+                        statusCode: 200,
+                        statusText: 'OK',
+                        headers: h,
+                    }));
+                    props.client_callback({type:'BYE', message:response, generated_branch: h.Via.branch, generated_tag: h.From.tag});
                     return;
                 }else if (response.statusCode == 401 || response.statusCode == 407) {
                     let challenge_data = (response.statusCode == 401) ? SIP.Parser.ParseHeaders(response.headers)['WWW-Authenticate'] : SIP.Parser.ParseHeaders(response.headers)['Proxy-Authenticate'];
