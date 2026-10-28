@@ -12,7 +12,7 @@ const HeaderParser = {
             "v":{uri: HeaderParser.URI, branch: HeaderParser.branchId},
             "CSeq": {count: HeaderParser.Cseq, method: HeaderParser.Cseq},
             "WWW-Authenticate": {realm: HeaderParser.Realm, nonce: HeaderParser.Nonce, algorithm: HeaderParser.Algorithm, qop: HeaderParser.Qop},
-            "Proxy-Authenticate": {realm: HeaderParser.Realm, nonce: HeaderParser.Nonce, algorithm: HeaderParser.Algorithm},
+            "Proxy-Authenticate": {realm: HeaderParser.Realm, nonce: HeaderParser.Nonce, algorithm: HeaderParser.Algorithm, qop: HeaderParser.Qop},
             "Authorization": {realm: HeaderParser.Realm, username: HeaderParser.Username, algorithm: HeaderParser.Algorithm, nonce: HeaderParser.Nonce, response: HeaderParser.Response},
             "Supported": HeaderParser.SpaceSeparated,
             "Allow-Events": HeaderParser.SpaceSeparated,
