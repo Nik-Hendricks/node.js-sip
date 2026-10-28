@@ -531,6 +531,25 @@ class VOIP{
     uas_handle_ack(msg, client_callback){
         let parsed_headers = SIP.Parser.ParseHeaders(msg.headers);
         let call_id = parsed_headers['Call-ID'];
+        let pending = (this.pending_invites || {})[call_id];
+        if(pending && pending.callee_endpoint && pending.callee_endpoint.type === 'extension' && pending.callee_endpoint.endpoint){
+            const callee = pending.callee_endpoint.endpoint;
+            const caller = pending.caller_endpoint.endpoint;
+            if(callee && callee.ip && callee.port){
+                this.internal_uac.server_send(SIP.Builder.SIPMessageObject({
+                    method: 'ACK',
+                    requestUri: `sip:${callee.extension || callee.username}@${callee.ip}:${callee.port}`,
+                    headers: {
+                        Via: { uri: { ip: this.transport.ip, port: this.transport.port }, branch: parsed_headers.Via.branch },
+                        To: parsed_headers.To,
+                        From: parsed_headers.From,
+                        CSeq: { count: parsed_headers.CSeq.count, method: 'ACK' },
+                        'Call-ID': call_id,
+                        ...(parsed_headers.Contact ? { Contact: parsed_headers.Contact } : {}),
+                    }
+                }), callee.ip, callee.port);
+            }
+        }
         if(this.pending_invites && this.pending_invites[call_id]){
             this.pending_invites[call_id].acked = true;
         }
@@ -543,6 +562,26 @@ class VOIP{
         let call_id = parsed_headers['Call-ID'];
         let client_ip = (parsed_headers.Contact && parsed_headers.Contact.contact) ? parsed_headers.Contact.contact.ip : null;
         let client_port = (parsed_headers.Contact && parsed_headers.Contact.contact) ? parsed_headers.Contact.contact.port : null;
+        let pending = (this.pending_invites || {})[call_id];
+        if(pending && pending.callee_endpoint && pending.callee_endpoint.type === 'extension' && pending.callee_endpoint.endpoint){
+            const callee = pending.callee_endpoint.endpoint;
+            const caller = pending.caller_endpoint.endpoint;
+            if(callee && callee.ip && callee.port){
+                this.internal_uac.server_send(SIP.Builder.SIPMessageObject({
+                    method: 'BYE',
+                    requestUri: `sip:${callee.extension || callee.username || callee.name}@${callee.ip}:${callee.port}`,
+                    headers: {
+                        Via: { uri: { ip: this.transport.ip, port: this.transport.port }, branch: SIP.Builder.generateBranch() },
+                        To: parsed_headers.To,
+                        From: parsed_headers.From,
+                        CSeq: { count: 2, method: 'BYE' },
+                        'Call-ID': call_id,
+                        ...(parsed_headers.Contact ? { Contact: parsed_headers.Contact } : {}),
+                    }
+                }), callee.ip, callee.port);
+            }
+        }
+
         if(client_ip && client_port){
             this.server_send(SIP.Builder.SIPMessageObject({
                 isResponse: true,
@@ -560,8 +599,25 @@ class VOIP{
     uas_handle_cancel(msg, client_callback){
         let parsed_headers = SIP.Parser.ParseHeaders(msg.headers);
         let call_id = parsed_headers['Call-ID'];
+        let pending = (this.pending_invites || {})[call_id];
         let client_ip = (parsed_headers.Contact && parsed_headers.Contact.contact) ? parsed_headers.Contact.contact.ip : null;
         let client_port = (parsed_headers.Contact && parsed_headers.Contact.contact) ? parsed_headers.Contact.contact.port : null;
+        if (pending && pending.callee_endpoint && pending.callee_endpoint.type === 'extension' && pending.callee_endpoint.endpoint) {
+            const callee = pending.callee_endpoint.endpoint;
+            if (callee && callee.ip && callee.port) {
+                this.internal_uac.server_send(SIP.Builder.SIPMessageObject({
+                    method: 'CANCEL',
+                    requestUri: `sip:${callee.extension || callee.username || callee.name}@${callee.ip}:${callee.port}`,
+                    headers: {
+                        Via: { uri: { ip: this.transport.ip, port: this.transport.port }, branch: SIP.Builder.generateBranch() },
+                        To: parsed_headers.To,
+                        From: parsed_headers.From,
+                        CSeq: { count: parsed_headers.CSeq.count, method: 'CANCEL' },
+                        'Call-ID': call_id,
+                    }
+                }), callee.ip, callee.port);
+            }
+        }
         if(client_ip && client_port){
             this.server_send(SIP.Builder.SIPMessageObject({
                 isResponse: true,
