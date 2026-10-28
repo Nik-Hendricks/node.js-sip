@@ -42,7 +42,7 @@ const cfg = {
   localIp: process.env.SIP_LOCAL_IP || utils.getLocalIpAddress(),
   localPort: Number(process.env.SIP_LOCAL_PORT || 0),
   target: process.env.SIP_TARGET || process.env.PHONE_NUMBER,
-  timeout: Number(process.env.SIP_TIMEOUT_MS || 30000),
+  timeout: Number(process.env.SIP_TIMEOUT_MS || 45000),
   audioPort: Number(process.env.SIP_AUDIO_PORT || 16000),
   hangupAfterMs: Number(process.env.SIP_HANGUP_AFTER_MS || 0),
 };

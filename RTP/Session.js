@@ -93,7 +93,7 @@ class Session{
             processToStop.once('exit', () => setTimeout(complete, 0));
             processToStop.once('error', () => setTimeout(complete, 0));
             try { processToStop.kill('SIGKILL'); } catch (e) { /* ignore */ }
-            setTimeout(complete, 150);
+            setTimeout(complete, 25);
             return {type: 'SESSION_OUTBOUND_STARTING', remote_ip: null, remote_port: null, codec: null, audio_file: this.audio_file};
         }
 

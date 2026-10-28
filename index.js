@@ -196,7 +196,7 @@ class VOIP{
         this.register_password = props.register_password;
         this.ip = this.transport.ip;
         this.port = this.transport.port;
-        this.max_retries = 10;
+        this.max_retries = 20;
         this.registration_interval = 10;
         this.registration_cseq = 1;
 
@@ -843,7 +843,7 @@ class VOIP{
                 if (completed) return;
                 console.log('INVITE timed out waiting for a response');
                 props.client_callback({type:'CALL_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
-            }, 10000);
+            }, 30000);
         };
 
         const clearInviteTimers = () => {
@@ -878,6 +878,7 @@ class VOIP{
                     console.log('400 Bad Request');
                     return;
                 }else if (response.method === 'BYE') {
+                    console.log('DEBUG UAC responding to inbound BYE');
                     let h = SIP.Parser.ParseHeaders(response.headers);
                     delete h['Content-Length'];
                     delete h['Content-Type'];
