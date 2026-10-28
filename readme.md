@@ -1,148 +1,136 @@
 # node.js-sip
 
-**node.js-sip** is a comprehensive VoIP framework for Node.js. Despite its name, this library goes beyond SIP (Session Initiation Protocol) and offers a full-fledged toolkit for building robust VoIP applications. Leverage its extensive capabilities for SIP transport, registration, messaging, call handling, and more.
+Node.js SIP and RTP toolbox used for building a User Agent Client (UAC), a User Agent Server (UAS), routers, IVR flows, and small VoIP test applications.
+
+## Current status
+
+This workspace has been hardened for the available test flow:
+
+- `npm test` passes: 17 tests.
+- `examples/b2bua_local_ivr_test.js` proves a local 127.0.0.1 client-to-IVR call can be acknowledged and kept alive past the 4-second range observed on the external CallCentric test.
+- The IVR environment test in `examples/ivr_env_test.js` uses UDP, direct G.711 uLaw RTP, RTCP sender reports, and loopback-safe NAT binding via the local configured `SIP_LOCAL_IP`.
 
 ## Features
 
-- **SIP Transport**: Built-in transport layer supporting UDP.
-- **Client and Server Modes**: Easily switch between User Agent Client (UAC) and User Agent Server (UAS).
-- **Call Handling**: Initiate, accept, reject, and terminate calls.
-- **Message Handling**: Send and receive SIP messages.
-- **Customizable**: Built with modularity and extensibility in mind.
+- UDP SIP transport.
+- UAC registration and outbound calls.
+- UAS handling for registration, INVITE, ACK, and BYE.
+- Route-based dispatch through `SIP Router`.
+- User endpoint support through `SIP UserManager`.
+- IVR endpoint support through `SIP IVRManager`.
+- RTP sessions that can bind to a local IPv4 address and advertise a different IPv4 RTP IP.
+- Direct raw `ulaw` media streaming as RTP.
+- RFC 2833 DTMF detection and duplicate-event suppression.
+- Local loopback test that removes carrier/NAT/handset behavior from the SIP media test.
 
-## Installation
+## Requirements
+
+- Node.js 18 or newer.
+- `ffmpeg` for regenerating or converting prompt media.
+- Shell environment variables or `examples/.env` credentials.
+- Network UDP permissions for SIP and RTP.
+
+## Quick start
+
+Install dependencies if needed:
 
 ```bash
-npm install node.js-sip
+npm install
 ```
 
-## Getting Started
+Check credentials in `examples/.env` or your `.env`:
 
-### Basic Usage
-
-Here's a quick example to demonstrate how to set up a client and make a SIP call.
-
-```javascript
-const VOIP = require('../index.js')
-const utils = require('../utils.js')
-const SIP = require('../SIP/index.js')
-
-//made up port to recieve audio
-var receive_port = 5000
-var call_id = '1234567890' + Math.floor(Math.random() * 100000000)
-
-var v = new VOIP({
-    type:'client',
-    transport:{
-        type: 'udp4',
-        port: 5060,
-    },
-    username:'1111',
-    register_password:'1234',
-    register_ip:'192.168.1.12',
-    register_port:5060,
-    callId:'1234567890'
-}, (d) => {
-    console.log(`client_test.js > d.type: ${d.type}`)
-    if(d.type == 'REGISTERED'){
-        console.log(`REGISTERED`)
-        v.uac_init_call({
-            to:'1001',
-            ip:'192.168.1.2',
-            port:'5050',
-            callId:call_id,
-            username:'1111',
-            branch: SIP.Builder.generateBranch(),
-            from_tag: SIP.Builder.generateTag(),
-            client_callback:(m) => {
-                console.log(`client_callback`)
-                console.log(m)
-                let parsed_headers = SIP.Parser.ParseHeaders(m.message.headers)
-                console.log(parsed_headers)
-                //when we recieve a 200 OK we send a 200 OK back
-                if(m.message.statusCode == 200){
-                    v.send(v.response({
-                        isResponse: true,
-                        statusCode: 200,
-                        statusText: 'OK',
-                        headers: parsed_headers,
-                        body: ` v=0 
-                                o=Z 0 ${call_id} IN IP4 ${utils.getLocalIpAddress()}
-                                s=Z
-                                c=IN IP4 ${utils.getLocalIpAddress()}
-                                t=0 0
-                                m=audio ${receive_port} RTP/AVP 106 9 98 101 0 8 3
-                                a=rtpmap:106 opus/48000/2
-                                a=fmtp:106 sprop-maxcapturerate=16000; minptime=20; useinbandfec=1
-                                a=rtpmap:98 telephone-event/48000
-                                a=fmtp:98 0-16
-                                a=rtpmap:101 telephone-event/8000
-                                a=fmtp:101 0-16
-                                a=sendrecv
-                                a=rtcp-mux`.replace(/^[ \t]+/gm, ''),
-                    }))
-                
-                }else if(m.message.method == 'BYE'){
-                    console.log(`BYE`)
-                    v.send(v.response({
-                        isResponse: true,
-                        statusCode: 200,
-                        statusText: 'OK',
-                        headers: parsed_headers,
-                        body: '',
-                    }))
-                }
-
-            }
-        })
-    }else if(d.type == 'REGISTER_FAILED'){
-        console.log(`REGISTER_FAILED`)
-        console.log(d.message)
-    }
-})
+```text
+SIP_USERNAME=...
+SIP_PASSWORD=...
+SIP_SERVER=sip.callcentric.net
+SIP_TARGET=...
+SIP_PORT=5060
+SIP_LOCAL_IP=192.168.1.215
 ```
 
-## API Reference
+Run the built-in test suite:
 
-### Constructor
+```bash
+npm test
+```
 
-#### `new VOIP(props, callback)`
-- `props`: Configuration object for the VOIP instance.
-  - `type`: `'client'` or `'server'`.
-  - `transport`: Transport configuration.
-    - `type`: `'udp4'` (currently supported).
-    - `ip`: Local IP address for the transport.
-    - `port`: Port for the transport.
-  - `username`: SIP username (for client).
-  - `register_password`: SIP password (for client).
-  - `register_ip`: Registrar IP (for client).
-  - `register_port`: Registrar port (default: `5060`).
-- `callback(response)`: Callback invoked on significant events.
+Run the integration suite:
 
-## TODO / Known Issues
-- Further orginization of the codebase is needed.
-- Finish RTP implementation.
-- UAS UAC Registrations does not actually check if the password is correct.
+```bash
+node --test tests/integration.test.js
+```
 
-### 🔆 Activity
+Run the local no-carrier IVR test:
 
-![Alt](https://repobeats.axiom.co/api/embed/aba9ef6e6abee84d7af22ab66a0ab294f23f44ed.svg "Repobeats analytics image")
+```bash
+node --test examples/b2bua_local_ivr_test.js
+```
 
-### 🌟 Star History
+Run the external IVR environment test:
 
-<a href="https://star-history.com/#Nik-Hendricks/node.js-sip&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Nik-Hendricks/node.js-sip&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Nik-Hendricks/node.js-sip&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Nik-Hendricks/node.js-sip&type=Date" />
- </picture>
-</a>
+```bash
+SIP_HANGUP_AFTER_MS=0 SIP_TIMEOUT_MS=60000 node examples/ivr_env_test.js 2>/dev/null
+```
+
+## Examples
+
+### External IVR test
+
+`examples/ivr_env_test.js` registers a UAC, makes one call, and connects a raw RTP session. Its diagnostics include:
+
+- INVITE/ACK/200 signaling.
+- Outbound raw `ulaw` streaming.
+- RTCP sender reports.
+- Inbound packet counts.
+- Remote `BYE` timing.
+- DTMF acceptance.
+
+Useful environment values:
+
+```bash
+SIP_HANGUP_AFTER_MS=0
+SIP_TIMEOUT_MS=60000
+SIP_LOCAL_IP=<advertised_or_local_IP>
+SIP_LOCAL_PORT=0
+```
+
+### Local B2BUA-style IVR test
+
+`examples/b2bua_local_ivr_test.js` creates a 127.0.0.1 UAS, routes a local client to an IVR endpoint, and verifies the call remains alive beyond the external 4-second symptom. This test isolates the library from carrier and handset behavior.
+
+## RTP notes
+
+- Direct raw media uses 160-byte, 20 ms, 8 kHz, G.711 uLaw payloads.
+- RTCP basic sender report timing is used to keep the media stream identifiable to providers.
+- Inbound RTP DTMF packets are deduplicated to suppress RFC 2833 retransmission noise.
+- Media examples assume PCMU for the direct IVR path.
+
+## Troubleshooting
+
+- `npm test` and `node --test tests/integration.test.js` are the fastest confidence checks.
+- For IVR external calls, logs containing `DTMF accepted: 1` indicate that digit traffic is reaching the application.
+- Logs containing `Remote BYE received` are generated by the far side. They are useful for separating carrier/handset hangs from local failures.
+- Inbound packet counts help determine whether RTP is arriving even when audio is not audible.
+- A local `b2bua_local_ivr_test.js` run isolates library behavior from network and phone behavior.
+
+## Known limitations
+
+- Transport is UDP IPv4 only.
+- SIP authentication and digest handling are basic.
+- TCP, TLS, STUN/TURN, ICE, SRTP, video, and full B2BUA media bridging are not implemented.
+- The IVR environment example does not maintain multiple concurrent calls.
+- Registration retry handling may still require more work for strict or changing proxy nonce sequences.
+
+## Architecture
+
+- `index.js`: top-level VOIP construction in client or server mode.
+- `SIP/`: SIP parsing, building, auth, routing, transport, trunk, user, and IVR support.
+- `RTP/`: RTP listeners, SDP/Session handling, and raw `ulaw` streaming.
+- `SDP/`: SDP parser.
+- `examples/`: client, server, and IVR test programs.
+- `tests/`: regression tests for auth, builders, parsers, routing, RTP, and integration behavior.
 
 ## License
 
-MIT License. See the [LICENSE](./LICENSE) file for more details.
-
----
-
-For detailed usage and advanced configurations, refer to the full documentation (coming soon).
-
+MIT License.
