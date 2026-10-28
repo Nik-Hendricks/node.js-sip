@@ -36,13 +36,8 @@ class Session{
     }
 
     start(){
-        if (this.ffmpeg && typeof this.ffmpeg.kill === 'function') {
-            try { this.ffmpeg.kill('SIGKILL'); } catch (e) { /* ignore */ }
-            try { if (this.ffmpeg.stdout) this.ffmpeg.stdout.destroy(); } catch (e) { /* ignore */ }
-            try { if (this.ffmpeg.stderr) this.ffmpeg.stderr.destroy(); } catch (e) { /* ignore */ }
-        }
-        this.ffmpeg = null;
-        this._spawnOutbound();
+        this._killOutboundSync();
+
 
         this.rtp_socket = require('dgram').createSocket('udp4');
         this.rtp_socket.on('error', (err) => {
@@ -57,6 +52,8 @@ class Session{
             }
             this._handleRtpPacket(msg, rinfo);
         });
+
+        this._spawnOutbound();
 
         const finishStart = () => {
             if (this.callback) this.callback({type: 'SESSION_STARTED'});
@@ -141,8 +138,7 @@ class Session{
             '-f', 'rtp', `rtp://${parsed_sdp.ip}:${parsed_sdp.port}`);
 
         console.log(`[RTP] outbound target=${parsed_sdp.ip}:${parsed_sdp.port} codec=${selected_codec.name} audio=${this.audio_file}`);
-        let ffmpeg = spawn('ffmpeg', args);
-        ffmpeg.stdout.on('data', (data) => { console.log(`stdout: ${data}`.trim()); });
+        let ffmpeg = spawn('ffmpeg', args, {stdio: ['ignore', 'ignore', 'pipe']});
         ffmpeg.stderr.on('data', (data) => { console.error(`stderr: ${data.toString().trim()}`); });
         this.ffmpeg = ffmpeg;
         this._outboundProcess = ffmpeg;
