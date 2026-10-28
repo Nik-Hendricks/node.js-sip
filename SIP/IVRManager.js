@@ -8,7 +8,11 @@ class IVRManager{
     }
 
     addIVR(props){
-        this.items[String(props.name)] = this.IVR(props);
+        const ivr = this.IVR(props);
+        ivr.start_stream = this.start_stream.bind(this);
+        ivr.stop_stream = this.stop_stream.bind(this);
+        ivr.handle_dtmf = this.handle_dtmf.bind(this);
+        this.items[String(props.name)] = ivr;
         console.log(this.items)
     }
 
@@ -19,9 +23,6 @@ class IVRManager{
     IVR(props){
         return {
             name: String(props.name),
-            start_stream: this.start_stream,
-            stop_stream: this.stop_stream,
-            handle_dtmf: this.handle_dtmf,
             streams: [],
         }
     }
@@ -91,7 +92,7 @@ class IVRManager{
 
         let ffmpegArgs = [
             '-re',
-            '-i', 'song.mp3',
+            '-i', require('path').join(__dirname, '..', 'sounds', 'test.mp3'),
             '-acodec', ffmpeg_codec_map[selected_codec.name],
             '-ar', selected_codec.rate,
             '-ac', selected_codec.channels,
@@ -112,7 +113,10 @@ class IVRManager{
 
     stop_stream(call_id){
         console.log('Stopping Stream')  
-        this.streams[call_id].kill('SIGINT');
+        if (this.streams[call_id] && typeof this.streams[call_id].kill === 'function') {
+            this.streams[call_id].kill('SIGINT');
+        }
+        delete this.streams[call_id];
         delete this.streams[call_id];
     }
 

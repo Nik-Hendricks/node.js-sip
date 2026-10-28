@@ -38,7 +38,14 @@ class Router{
             if(desired_endpoint.match(this.routes[route].match)){
                 ret = {...this.routes[route]}
                 ret.endpoint_type = this.endpoint_types[ret.type];
-                ret.endpoint =  ret.endpoint_type.manager.items[ret.endpoint];
+                var key = ret.endpoint;
+                var items = (ret.endpoint_type && ret.endpoint_type.manager) ? ret.endpoint_type.manager.items : null;
+                if(items && items[key] === undefined && typeof key === 'string' && key.indexOf(':') !== -1){
+                    key = key.slice(key.lastIndexOf(':') + 1);
+                }
+                if(items){
+                    ret.endpoint = items[key];
+                }
             }
         }
         return ret;

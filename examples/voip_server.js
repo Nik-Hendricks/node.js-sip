@@ -27,7 +27,7 @@ const VOIP = require('../')
 var server = new VOIP({
     type:'server',
     transport:{
-        type: 'UDP',
+        type: 'udp4',
         port: 5060,
     },
 },
@@ -59,7 +59,7 @@ server.UserManager.addUser({
     password:'rootPassword',
 })
 
-console.log(server.UserManager.users)
+console.log(server.UserManager.items)
 
 server.TrunkManager.addTrunk({
     name:'trunk1',
@@ -79,5 +79,5 @@ server.Router.addRoute({
 })
 
 setTimeout(() => {
-    server.TrunkManager.trunks['trunk1'].register();
+    console.log('trunk created:', Object.keys(server.TrunkManager.items));
 }, 1000)

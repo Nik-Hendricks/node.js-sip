@@ -7,6 +7,9 @@ class SessionManager{
     }
 
     new_session(props){
+        if(!props || props.call_id === undefined){
+            throw new Error('SessionManager.new_session requires call_id');
+        }
         //pick a random port for listening
         let port = Math.floor(Math.random() * 65535) + 1;
         let listen_sdp = `v=0
@@ -27,6 +30,14 @@ class SessionManager{
         props.listen_sdp = listen_sdp;
         this.sessions[props.call_id] = new Session(props);
         return this.sessions[props.call_id];
+    }
+
+    remove_session(call_id){
+        const session = this.sessions[call_id];
+        if(session){
+            try { session.stop(); } catch (e) { /* ignore */ }
+            delete this.sessions[call_id];
+        }
     }
 }
 
