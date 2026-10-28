@@ -108,6 +108,7 @@ rtpSession.start();
 
 let audioState = 'main';
 let acknowledged = false;
+let answerTime = 0;
 let finished = false;
 let hangupTimer = null;
 let statsTimer = null;
@@ -177,12 +178,13 @@ const client = new VOIP({
           console.log('Call event:', statusCode || method);
 
           if (method === 'BYE') {
-            console.log('Remote BYE received');
+            console.log('Remote BYE received', JSON.stringify({elapsed_ms:Date.now()-answerTime}));
             finish(0);
           }
 
           if (statusCode === 200 && !acknowledged) {
             acknowledged = true;
+            answerTime = Date.now();
             const headers = SIP.Parser.ParseHeaders(response.message.headers);
             const contact = headers.Contact && headers.Contact.contact;
             const ip = (contact && contact.ip) || cfg.server;
@@ -202,8 +204,7 @@ const client = new VOIP({
             });
             console.log('ACK sent to ' + ip + ':' + port);
             statsTimer = setInterval(() => {
-              console.log('Inbound RTP stats:', JSON.stringify(rtpSession.rtpStats()));
-              console.log('Outbound RTP stats:', JSON.stringify(rtpSession.outboundStats()));
+              console.log(JSON.stringify({event:'media_stats', elapsed_ms:Date.now()-answerTime, inbound:rtpSession.rtpStats(), outbound:rtpSession.outboundStats()}));
             }, 3000);
 
             if (response.message && response.message.body) {
