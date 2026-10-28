@@ -911,9 +911,9 @@ class VOIP{
             if(this.server_uac == true){
                 this.server_send(inv_message, props.ip, props.port, (response) => {
                     clearInviteTimers();
-                    if (!response || typeof response.statusCode !== 'number') return;
+                    if (!response) return;
                     if (completed) return;
-                    completed = response.statusCode >= 200 && response.statusCode < 300;
+                    completed = (typeof response.statusCode === 'number' && response.statusCode >= 200 && response.statusCode < 300);
                     responses(response);
                     if (completed && props.auto_ack === true) {
                         this.ack({
@@ -933,9 +933,9 @@ class VOIP{
             }else{
                 this.send(inv_message, (response) => {
                     clearInviteTimers();
-                    if (!response || typeof response.statusCode !== 'number') return;
+                    if (!response) return;
                     if (completed) return;
-                    completed = response.statusCode >= 200 && response.statusCode < 300;
+                    completed = (typeof response.statusCode === 'number' && response.statusCode >= 200 && response.statusCode < 300);
                     responses(response);
                     if (completed && props.auto_ack === true) {
                         this.ack({
