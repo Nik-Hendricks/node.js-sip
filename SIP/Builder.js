@@ -46,10 +46,12 @@ const Builder = {
         }
         if (props.challenge_data) {
             var cnonce = Builder.generateBranch();
+            const challengeQop = (props.challenge_data && props.challenge_data.qop) ? props.challenge_data.qop : null;
+            const qopSuffix = challengeQop ? `, qop="${challengeQop}", cnonce="${cnonce}", nc="00000001"` : '';
             if(props.proxy_auth == true){
-                ret.headers['Proxy-Authorization'] = `Digest username="${props.username}", realm="${props.challenge_data.realm}", nonce="${props.challenge_data.nonce}", uri="${ret.requestUri}", response="${Builder.DigestResponse(props.username, props.password, props.challenge_data.realm, props.challenge_data.nonce, ret.method, ret.requestUri, props.challenge_data.qop, cnonce, '00000001')}", qop="${props.challenge_data.qop}", cnonce="${cnonce}", nc="00000001", algorithm="MD5"`;
+                ret.headers['Proxy-Authorization'] = `Digest username="${props.username}", realm="${props.challenge_data.realm}", nonce="${props.challenge_data.nonce}", uri="${ret.requestUri}", response="${Builder.DigestResponse(props.username, props.password, props.challenge_data.realm, props.challenge_data.nonce, ret.method, ret.requestUri, props.challenge_data.qop, cnonce, '00000001')}", algorithm="MD5"${qopSuffix}`;
             }else{
-                ret.headers['Authorization'] = `Digest username="${props.username}", realm="${props.challenge_data.realm}", nonce="${props.challenge_data.nonce}", uri="${ret.requestUri}", response="${Builder.DigestResponse(props.username, props.password, props.challenge_data.realm, props.challenge_data.nonce, ret.method, ret.requestUri, props.challenge_data.qop, cnonce, '00000001')}", qop="${props.challenge_data.qop}", cnonce="${cnonce}", nc="00000001", algorithm="MD5"`;
+                ret.headers['Authorization'] = `Digest username="${props.username}", realm="${props.challenge_data.realm}", nonce="${props.challenge_data.nonce}", uri="${ret.requestUri}", response="${Builder.DigestResponse(props.username, props.password, props.challenge_data.realm, props.challenge_data.nonce, ret.method, ret.requestUri, props.challenge_data.qop, cnonce, '00000001')}", algorithm="MD5"${qopSuffix}`;
             }
         }
 
@@ -61,7 +63,6 @@ const Builder = {
             ret.headers.Contact = ret.headers.Contact + `;expires=${props.expires}`;
         }
 
-        console.log(ret)
         return ret;
     },
 
@@ -111,7 +112,11 @@ const Builder = {
     DigestResponse:(username, password, realm, nonce, method, uri, qop, cnonce, nc) => {
         const ha1 = crypto.createHash('md5').update(`${username}:${realm}:${password}`).digest('hex');
         const ha2 = crypto.createHash('md5').update(`${method}:${uri}`).digest('hex');
-        const response = crypto.createHash('md5').update(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`).digest('hex');
+        if(qop && String(qop).toLowerCase() === 'auth'){
+            const response = crypto.createHash('md5').update(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`).digest('hex');
+            return response;
+        }
+        const response = crypto.createHash('md5').update(`${ha1}:${nonce}:${ha2}`).digest('hex');
         return response;
     },        
 

@@ -104,6 +104,18 @@ class VOIP{
                     port: props.callee_endpoint.endpoint.port,
                     body: props.root_invite_body,
                     client_callback: (root_response) => {
+                        let pending = this.pending_invites && this.pending_invites[props.root_invite_headers['Call-ID']];
+                        if (pending && pending.cancelled) {
+                            console.log('EXTENSION BEHAVIOR: INVITE already cancelled');
+                            this.server_send(SIP.Builder.SIPMessageObject({
+                                isResponse: true,
+                                statusCode: 487,
+                                statusText: 'Request Terminated',
+                                headers: SIP.Parser.ParseHeaders({ ...root_response.message.headers }),
+                            }), props.caller_endpoint.endpoint.ip, props.caller_endpoint.endpoint.port);
+                            return;
+                        }
+
                         let m = {...root_response.message};
                         m.headers = SIP.Parser.ParseHeaders(m.headers);
                         this.server_send(SIP.Builder.SIPMessageObject(m), props.caller_endpoint.endpoint.ip, props.caller_endpoint.endpoint.port, (d) => {
@@ -128,6 +140,13 @@ class VOIP{
                 let s = this.SessionManager.new_session({
                     call_id: props.root_invite_headers['Call-ID'],
                     sdp: props.root_invite_body,
+                    dtmf_callback: (event) => {
+                        console.log('IVR DTMF:', event.digit, 'duration:', event.duration);
+                        let ivr = this.IVRManager.items && this.IVRManager.items[props.callee_endpoint.endpoint.name];
+                        if (ivr && typeof ivr.handle_dtmf === 'function') {
+                            // Keep the legacy hook available; it is intentionally a no-op unless explicitly used.
+                        }
+                    },
                     callback: (d) => {
                         if(d.type == 'SESSION_STARTED'){
                             h['Content-Type'] = 'application/sdp';
@@ -177,7 +196,7 @@ class VOIP{
         this.register_password = props.register_password;
         this.ip = this.transport.ip;
         this.port = this.transport.port;
-        this.max_retries = 10;
+        this.max_retries = 20;
         this.registration_interval = 10;
         this.registration_cseq = 1;
 
@@ -309,6 +328,19 @@ class VOIP{
         var tag = SIP.Parser.ParseHeaders(res.headers).From.tag;
         var branch = SIP.Parser.ParseHeaders(res.headers).Via.branch;
         var type = res.method || res.statusCode;
+        if(type == 'BYE'){
+            let h = SIP.Parser.ParseHeaders(res.headers);
+            delete h['Content-Length'];
+            delete h['Content-Type'];
+            this.send(SIP.Builder.SIPMessageObject({
+                isResponse: true,
+                statusCode: 200,
+                statusText: 'OK',
+                headers: h,
+            }));
+            client_callback({type:'BYE', message:res});
+            return;
+        }
         if(type == 'NOTIFY'){
             console.log('uac_responses > NOTIFY')
             let h =  SIP.Parser.ParseHeaders(res.headers)
@@ -351,7 +383,6 @@ class VOIP{
         let client_username = parsed_headers.Contact.contact.username;
         let client_ip = parsed_headers.Contact.contact.ip;
         let client_port = parsed_headers.Contact.contact.port;
-        console.log(parsed_headers)
 
         if(this.UserManager.items[client_username] !== undefined){
             this.UserManager.items[client_username].ip = client_ip;
@@ -459,6 +490,9 @@ class VOIP{
 
         const existing_invite = (this.pending_invites || {})[root_invite_headers['Call-ID']];
         if(existing_invite){
+            if (existing_invite.session && typeof existing_invite.session.update === 'function' && root_invite_body) {
+                try { existing_invite.session.update(root_invite_body); } catch(e) {}
+            }
             let client_ip = root_invite_headers.Contact.contact.ip;
             let client_port = root_invite_headers.Contact.contact.port;
             let body = (existing_invite.session && existing_invite.session.listen_sdp) ? existing_invite.session.listen_sdp : (root_invite_body || '');
@@ -528,6 +562,25 @@ class VOIP{
     uas_handle_ack(msg, client_callback){
         let parsed_headers = SIP.Parser.ParseHeaders(msg.headers);
         let call_id = parsed_headers['Call-ID'];
+        let pending = (this.pending_invites || {})[call_id];
+        if(pending && pending.callee_endpoint && pending.callee_endpoint.type === 'extension' && pending.callee_endpoint.endpoint){
+            const callee = pending.callee_endpoint.endpoint;
+            const caller = pending.caller_endpoint.endpoint;
+            if(callee && callee.ip && callee.port){
+                this.internal_uac.server_send(SIP.Builder.SIPMessageObject({
+                    method: 'ACK',
+                    requestUri: `sip:${callee.extension || callee.username}@${callee.ip}:${callee.port}`,
+                    headers: {
+                        Via: { uri: { ip: this.transport.ip, port: this.transport.port }, branch: parsed_headers.Via.branch },
+                        To: parsed_headers.To,
+                        From: parsed_headers.From,
+                        CSeq: { count: parsed_headers.CSeq.count, method: 'ACK' },
+                        'Call-ID': call_id,
+                        ...(parsed_headers.Contact ? { Contact: parsed_headers.Contact } : {}),
+                    }
+                }), callee.ip, callee.port);
+            }
+        }
         if(this.pending_invites && this.pending_invites[call_id]){
             this.pending_invites[call_id].acked = true;
         }
@@ -540,6 +593,26 @@ class VOIP{
         let call_id = parsed_headers['Call-ID'];
         let client_ip = (parsed_headers.Contact && parsed_headers.Contact.contact) ? parsed_headers.Contact.contact.ip : null;
         let client_port = (parsed_headers.Contact && parsed_headers.Contact.contact) ? parsed_headers.Contact.contact.port : null;
+        let pending = (this.pending_invites || {})[call_id];
+        if(pending && pending.callee_endpoint && pending.callee_endpoint.type === 'extension' && pending.callee_endpoint.endpoint){
+            const callee = pending.callee_endpoint.endpoint;
+            const caller = pending.caller_endpoint.endpoint;
+            if(callee && callee.ip && callee.port){
+                this.internal_uac.server_send(SIP.Builder.SIPMessageObject({
+                    method: 'BYE',
+                    requestUri: `sip:${callee.extension || callee.username || callee.name}@${callee.ip}:${callee.port}`,
+                    headers: {
+                        Via: { uri: { ip: this.transport.ip, port: this.transport.port }, branch: SIP.Builder.generateBranch() },
+                        To: parsed_headers.To,
+                        From: parsed_headers.From,
+                        CSeq: { count: 2, method: 'BYE' },
+                        'Call-ID': call_id,
+                        ...(parsed_headers.Contact ? { Contact: parsed_headers.Contact } : {}),
+                    }
+                }), callee.ip, callee.port);
+            }
+        }
+
         if(client_ip && client_port){
             this.server_send(SIP.Builder.SIPMessageObject({
                 isResponse: true,
@@ -557,8 +630,26 @@ class VOIP{
     uas_handle_cancel(msg, client_callback){
         let parsed_headers = SIP.Parser.ParseHeaders(msg.headers);
         let call_id = parsed_headers['Call-ID'];
+        let pending = (this.pending_invites || {})[call_id];
+        if (pending) pending.cancelled = true;
         let client_ip = (parsed_headers.Contact && parsed_headers.Contact.contact) ? parsed_headers.Contact.contact.ip : null;
         let client_port = (parsed_headers.Contact && parsed_headers.Contact.contact) ? parsed_headers.Contact.contact.port : null;
+        if (pending && pending.callee_endpoint && pending.callee_endpoint.type === 'extension' && pending.callee_endpoint.endpoint) {
+            const callee = pending.callee_endpoint.endpoint;
+            if (callee && callee.ip && callee.port) {
+                this.internal_uac.server_send(SIP.Builder.SIPMessageObject({
+                    method: 'CANCEL',
+                    requestUri: `sip:${callee.extension || callee.username || callee.name}@${callee.ip}:${callee.port}`,
+                    headers: {
+                        Via: { uri: { ip: this.transport.ip, port: this.transport.port }, branch: SIP.Builder.generateBranch() },
+                        To: parsed_headers.To,
+                        From: parsed_headers.From,
+                        CSeq: { count: parsed_headers.CSeq.count, method: 'CANCEL' },
+                        'Call-ID': call_id,
+                    }
+                }), callee.ip, callee.port);
+            }
+        }
         if(client_ip && client_port){
             this.server_send(SIP.Builder.SIPMessageObject({
                 isResponse: true,
@@ -617,80 +708,120 @@ class VOIP{
     }
 
     register(props, client_callback){
-        var try_count = 0;
-        var headers = {
-            'Via': { uri: { ip: this.transport.ip, port: this.transport.port } },
-            'To': { contact: { username: this.username, ip: props.register_ip, port: props.register_port } },
-            'From': { contact: { username: this.username, ip: this.transport.ip, port: this.transport.port } },
-            'CSeq': { count: '1', method: 'REGISTER' },
-            'Contact': { contact: { username: props.username, ip: this.transport.ip, port: this.transport.port } },
+        props = props || {};
+        this.username = props.username || this.username;
+        this.register_password = props.register_password || this.register_password;
+        this.register_ip = props.register_ip || this.register_ip;
+        this.register_port = props.register_port || this.register_port || 5060;
+        if(!this.registration_call_id){
+            this.registration_call_id = `reg_${Math.floor(Math.random() * 1000000000)}`;
+        }
+        if(!this.registration_cseq){
+            this.registration_cseq = 0;
+        }else{
+            this.registration_call_id = `reg_${Math.floor(Math.random() * 1000000000)}`;
+            this.registration_cseq = 0;
         }
 
-        const sendRegister = (challenge_headers, proxy_auth = false) => {
+        var headers = {
+            'Via': { uri: { ip: this.transport.ip, port: this.transport.port } },
+            'To': { contact: { username: this.username, ip: this.register_ip, port: this.register_port } },
+            'From': { contact: { username: this.username, ip: this.transport.ip, port: this.transport.port } },
+            'CSeq': { count: '1', method: 'REGISTER' },
+            'Contact': { contact: { username: this.username, ip: this.transport.ip, port: this.transport.port }, expires: 3600 },
+            'Call-ID': this.registration_call_id,
+            'Expires': 3600,
+        };
+
+        var try_count = 0;
+        const max_retries = this.max_retries || 10;
+
+        const fail = (message) => {
+            console.log('REGISTER_FAILED', message && message.statusText);
+            client_callback({type:'REGISTER_FAILED', message: message || {statusCode:408, statusText:'Request Timeout'}});
+        };
+
+        const succeed = (response) => {
+            var parsed_headers = SIP.Parser.ParseHeaders(response.headers);
+            var expires = 3600;
+            if(parsed_headers.Contact && parsed_headers.Contact.contact && parsed_headers.Contact.contact.expires){
+                expires = parseInt(parsed_headers.Contact.contact.expires, 10) || expires;
+            } else if(parsed_headers.Expires){
+                expires = parseInt(parsed_headers.Expires, 10) || expires;
+            }
+            console.log(`REGISTERED for ${expires} seconds`);
+            this.status = 'REGISTERED';
+            client_callback({type:'REGISTERED', message:response});
+            setTimeout(() => {
+                this.register({
+                    username: this.username,
+                    register_password: this.register_password,
+                    register_ip: this.register_ip,
+                    register_port: this.register_port,
+                }, client_callback);
+            }, expires * 1000);
+        };
+
+        const sendAttempt = (challenge_data, proxy_auth) => {
             try_count++;
-            this.registration_cseq++;
-            if(try_count > this.max_retries){
-                console.log('Max retries reached');
-                client_callback({type:'REGISTER_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
+            if(try_count > max_retries + 1){
+                fail({statusCode:408, statusText:'Request Timeout (max retries)'});
                 return;
             }
+
+            this.registration_cseq++;
+            headers.CSeq.count = String(this.registration_cseq);
+            console.log(`Sending REGISTER attempt ${try_count} to ${this.register_ip}:${this.register_port}`);
 
             this.send(SIP.Builder.SIPMessageObject({
                 isResponse: false,
                 method: 'REGISTER',
                 requestUri: `sip:${this.register_ip}:${this.register_port}`,
                 headers: headers,
-                challenge_data: challenge_headers,
-                proxy_auth: proxy_auth
-            }), (d) => {
-
-                let ph = SIP.Parser.ParseHeaders(d.headers);
-                let challenge_data = (ph['WWW-Authenticate'] !== undefined) ? ph['WWW-Authenticate'] : ph['Proxy-Authenticate'];
-                headers.CSeq.count = this.registration_cseq;
-                this.send(SIP.Builder.SIPMessageObject({
-                    isResponse: false,
-                    method: 'REGISTER',
-                    requestUri: `sip:${this.register_ip}:${this.register_port}`,
-                    headers: headers,
-                    challenge_data: challenge_data,
-                    proxy_auth: (ph['Proxy-Authenticate'] !== undefined) ? true : false,
-                    username: this.username,
-                    password: this.register_password
-                }), (d) => {
-                    let parsed_headers = SIP.Parser.ParseHeaders(d.headers);
-                    if(d.statusCode == 200){
-
-                        console.log(`REGISTERED for ${parsed_headers.Contact.expires} seconds`);
-                        setTimeout(() => {
-                            let tag = parsed_headers.From.tag;
-                            let branch = parsed_headers.Via.branch;
-                            props.callId = SIP.Builder.generateBranch();
-                            this.register(props, client_callback);
-                        }, parsed_headers.Contact.expires * 1000);
-                        this.status = 'REGISTERED';
-                        client_callback({type:'REGISTERED', message:d})
-                    }else if(d.statusCode == 401){
-                        let challenge_data = SIP.Parser.ParseHeaders(d.headers)['WWW-Authenticate'];
-                        sendRegister(challenge_data, false);
-                    }else if(d.statusCode == 403){
-                        console.log(`${d.statusCode} ${d.statusText}`);
-                        client_callback({type:'REGISTER_FAILED', message:d})
-                    }else if(d.statusCode == 407){
-                        let challenge_data = SIP.Parser.ParseHeaders(d.headers)['Proxy-Authenticate'];
-                        sendRegister(challenge_data, true);
-                    }else{
-                        console.log('Unexpected status code:', d.statusCode);
+                challenge_data: challenge_data || undefined,
+                proxy_auth: proxy_auth,
+                username: this.username,
+                password: this.register_password,
+                expires: 3600,
+            }), (response) => {
+                if(!response || typeof response.statusCode !== 'number'){
+                    fail({statusCode:408, statusText:'No SIP response'});
+                    return;
+                }
+                if(response.statusCode === 200){
+                    succeed(response);
+                    return;
+                }
+                if(response.statusCode === 401 || response.statusCode === 407){
+                    var parsed_headers = SIP.Parser.ParseHeaders(response.headers);
+                    var challenge_data = (response.statusCode === 401)
+                        ? parsed_headers['WWW-Authenticate']
+                        : parsed_headers['Proxy-Authenticate'];
+                    var new_proxy_auth = (response.statusCode === 407);
+                    if(!challenge_data){
+                        fail(response);
+                        return;
                     }
-                })
-            })
-        }
+                    sendAttempt(challenge_data, new_proxy_auth);
+                    return;
+                }
+                if(response.statusCode === 403){
+                    console.log(`${response.statusCode} ${response.statusText}`);
+                    client_callback({type:'REGISTER_FAILED', message:response});
+                    return;
+                }
+                console.log('Unexpected status code:', response.statusCode);
+                fail(response);
+            });
+        };
 
-        sendRegister();
+        sendAttempt(null, false);
     }
 
     uac_init_call(props){
         var cseq = 1;
         var try_count = 0;
+        if (props.auto_ack === undefined) props.auto_ack = true;
 
         var h = {
             'Via': { uri: { ip: this.transport.ip, port: this.transport.port }, branch: props.branch },
@@ -703,13 +834,32 @@ class VOIP{
         }
 
 
+        let inviteTimer = null;
+        let retransmissionTimer = null;
+        let completed = false;
+        const armInviteTimer = () => {
+            if (inviteTimer) clearTimeout(inviteTimer);
+            inviteTimer = setTimeout(() => {
+                if (completed) return;
+                console.log('INVITE timed out waiting for a response');
+                props.client_callback({type:'CALL_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
+            }, 30000);
+        };
+
+        const clearInviteTimers = () => {
+            if (inviteTimer) { clearTimeout(inviteTimer); inviteTimer = null; }
+            if (retransmissionTimer) { clearTimeout(retransmissionTimer); retransmissionTimer = null; }
+        };
+
         const sendInvite = (challenge_headers, proxy_auth = false) => {
             try_count++;
             if(try_count > this.max_retries){
+                clearInviteTimers();
                 console.log('Max retries reached');
                 props.client_callback({type:'CALL_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
                 return;
             }
+            if (retransmissionTimer) { clearTimeout(retransmissionTimer); retransmissionTimer = null; }
             
             let inv_message = SIP.Builder.SIPMessageObject({
                 isResponse: false,
@@ -727,26 +877,117 @@ class VOIP{
                 if(response.statusCode == 400){
                     console.log('400 Bad Request');
                     return;
+                }else if (response.method === 'BYE') {
+                    let h = SIP.Parser.ParseHeaders(response.headers);
+                    delete h['Content-Length'];
+                    delete h['Content-Type'];
+                    this.send(SIP.Builder.SIPMessageObject({
+                        isResponse: true,
+                        statusCode: 200,
+                        statusText: 'OK',
+                        headers: h,
+                    }));
+                    props.client_callback({type:'BYE', message:response, generated_branch: h.Via.branch, generated_tag: h.From.tag});
+                    return;
                 }else if (response.statusCode == 401 || response.statusCode == 407) {
                     let challenge_data = (response.statusCode == 401) ? SIP.Parser.ParseHeaders(response.headers)['WWW-Authenticate'] : SIP.Parser.ParseHeaders(response.headers)['Proxy-Authenticate'];
-                    sendInvite(challenge_data, false);
+                    armInviteTimer();
+                    sendInvite(challenge_data, response.statusCode === 407);
                 }else{
                     props.client_callback({type: response.statusCode || response.method, message: response, generated_branch: h.branchId, generated_tag: h.from_tag, sdp: response.body});
                 }
             }
 
+            if (props.retransmit === true && retransmissionTimer === null) {
+                let nextDelay = 500;
+                retransmissionTimer = setTimeout(() => {
+                    retransmissionTimer = null;
+                    if (completed) return;
+                    console.log('Retransmitting INVITE to ' + props.ip + ':' + props.port);
+                    sendInvite(challenge_headers, proxy_auth);
+                }, nextDelay);
+            }
+
             if(this.server_uac == true){
                 this.server_send(inv_message, props.ip, props.port, (response) => {
-                    responses(response)
+                    clearInviteTimers();
+                    if (!response) return;
+                    if (response.method === 'BYE') {
+                        responses(response);
+                        return;
+                    }
+                    if (completed) return;
+                    completed = (typeof response.statusCode === 'number' && response.statusCode >= 200 && response.statusCode < 300);
+                    responses(response);
+                    if (completed && props.auto_ack === true) {
+                        this.ack({
+                            to: props.to,
+                            ip: props.ip,
+                            port: props.port,
+                            from: props.username,
+                            to_tag: (SIP.Parser.ParseHeaders(response.headers)).To.tag,
+                            from_tag: props.from_tag,
+                            branch: props.branch,
+                            callId: props.callId,
+                            cseq: 1,
+                            requestUri: `sip:${props.to}@${props.ip}:${props.port}`,
+                        });
+                    }
                 });
             }else{
                 this.send(inv_message, (response) => {
-                    responses(response)
+                    clearInviteTimers();
+                    if (!response) return;
+                    if (response.method === 'BYE') {
+                        responses(response);
+                        return;
+                    }
+                    if (completed) return;
+                    completed = (typeof response.statusCode === 'number' && response.statusCode >= 200 && response.statusCode < 300);
+                    responses(response);
+                    if (completed && props.auto_ack === true) {
+                        this.ack({
+                            to: props.to,
+                            ip: props.ip,
+                            port: props.port,
+                            from: props.username,
+                            to_tag: (SIP.Parser.ParseHeaders(response.headers)).To.tag,
+                            from_tag: props.from_tag,
+                            branch: props.branch,
+                            callId: props.callId,
+                            cseq: 1,
+                            requestUri: `sip:${props.to}@${props.ip}:${props.port}`,
+                        });
+                    }
                 });
             }
         }
 
+        armInviteTimer();
         sendInvite();
+    }
+
+    cancel(props){
+        props = props || {};
+        const headers = (typeof props.headers === 'object' && props.headers !== null) ? props.headers : {
+            'Via': { uri: { ip: this.transport.ip, port: this.transport.port }, branch: props.branch || SIP.Builder.generateBranch() },
+            'To': { contact: { username: props.to, ip: props.ip, port: props.port } },
+            'From': { contact: { username: props.from || this.username, ip: this.transport.ip, port: this.transport.port }, tag: props.from_tag },
+            'CSeq': { count: props.cseq || 1, method: 'CANCEL' },
+            'Call-ID': props.callId,
+        };
+        const message = SIP.Builder.SIPMessageObject({
+            isResponse: false,
+            method: 'CANCEL',
+            requestUri: props.requestUri || `sip:${props.to}@${props.ip}:${props.port}`,
+            headers: headers,
+        });
+        if (props.ip && props.port) {
+            this.server_send(message, props.ip, props.port, props.callback);
+        } else {
+            this.send(message, props.callback);
+        }
+        return message;
     }
 
     response(props){
