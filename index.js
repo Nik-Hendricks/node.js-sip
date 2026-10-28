@@ -620,75 +620,114 @@ class VOIP{
     }
 
     register(props, client_callback){
-        var try_count = 0;
-        var headers = {
-            'Via': { uri: { ip: this.transport.ip, port: this.transport.port } },
-            'To': { contact: { username: this.username, ip: props.register_ip, port: props.register_port } },
-            'From': { contact: { username: this.username, ip: this.transport.ip, port: this.transport.port } },
-            'CSeq': { count: '1', method: 'REGISTER' },
-            'Contact': { contact: { username: props.username, ip: this.transport.ip, port: this.transport.port } },
+        props = props || {};
+        this.username = props.username || this.username;
+        this.register_password = props.register_password || this.register_password;
+        this.register_ip = props.register_ip || this.register_ip;
+        this.register_port = props.register_port || this.register_port || 5060;
+        if(!this.registration_call_id){
+            this.registration_call_id = `reg_${Math.floor(Math.random() * 1000000000)}`;
+        }
+        if(!this.registration_cseq){
+            this.registration_cseq = 0;
+        }else{
+            this.registration_call_id = `reg_${Math.floor(Math.random() * 1000000000)}`;
+            this.registration_cseq = 0;
         }
 
-        const sendRegister = (challenge_headers, proxy_auth = false) => {
+        var headers = {
+            'Via': { uri: { ip: this.transport.ip, port: this.transport.port } },
+            'To': { contact: { username: this.username, ip: this.register_ip, port: this.register_port } },
+            'From': { contact: { username: this.username, ip: this.transport.ip, port: this.transport.port } },
+            'CSeq': { count: '1', method: 'REGISTER' },
+            'Contact': { contact: { username: this.username, ip: this.transport.ip, port: this.transport.port }, expires: 3600 },
+            'Call-ID': this.registration_call_id,
+            'Expires': 3600,
+        };
+
+        var try_count = 0;
+        const max_retries = this.max_retries || 10;
+
+        const fail = (message) => {
+            console.log('REGISTER_FAILED', message && message.statusText);
+            client_callback({type:'REGISTER_FAILED', message: message || {statusCode:408, statusText:'Request Timeout'}});
+        };
+
+        const succeed = (response) => {
+            var parsed_headers = SIP.Parser.ParseHeaders(response.headers);
+            var expires = 3600;
+            if(parsed_headers.Contact && parsed_headers.Contact.contact && parsed_headers.Contact.contact.expires){
+                expires = parseInt(parsed_headers.Contact.contact.expires, 10) || expires;
+            } else if(parsed_headers.Expires){
+                expires = parseInt(parsed_headers.Expires, 10) || expires;
+            }
+            console.log(`REGISTERED for ${expires} seconds`);
+            this.status = 'REGISTERED';
+            client_callback({type:'REGISTERED', message:response});
+            setTimeout(() => {
+                this.register({
+                    username: this.username,
+                    register_password: this.register_password,
+                    register_ip: this.register_ip,
+                    register_port: this.register_port,
+                }, client_callback);
+            }, expires * 1000);
+        };
+
+        const sendAttempt = (challenge_data, proxy_auth) => {
             try_count++;
-            this.registration_cseq++;
-            if(try_count > this.max_retries){
-                console.log('Max retries reached');
-                client_callback({type:'REGISTER_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
+            if(try_count > max_retries + 1){
+                fail({statusCode:408, statusText:'Request Timeout (max retries)'});
                 return;
             }
+
+            this.registration_cseq++;
+            headers.CSeq.count = String(this.registration_cseq);
+            console.log(`Sending REGISTER attempt ${try_count} to ${this.register_ip}:${this.register_port}`);
 
             this.send(SIP.Builder.SIPMessageObject({
                 isResponse: false,
                 method: 'REGISTER',
                 requestUri: `sip:${this.register_ip}:${this.register_port}`,
                 headers: headers,
-                challenge_data: challenge_headers,
-                proxy_auth: proxy_auth
-            }), (d) => {
-
-                let ph = SIP.Parser.ParseHeaders(d.headers);
-                let challenge_data = (ph['WWW-Authenticate'] !== undefined) ? ph['WWW-Authenticate'] : ph['Proxy-Authenticate'];
-                headers.CSeq.count = this.registration_cseq;
-                this.send(SIP.Builder.SIPMessageObject({
-                    isResponse: false,
-                    method: 'REGISTER',
-                    requestUri: `sip:${this.register_ip}:${this.register_port}`,
-                    headers: headers,
-                    challenge_data: challenge_data,
-                    proxy_auth: (ph['Proxy-Authenticate'] !== undefined) ? true : false,
-                    username: this.username,
-                    password: this.register_password
-                }), (d) => {
-                    let parsed_headers = SIP.Parser.ParseHeaders(d.headers);
-                    if(d.statusCode == 200){
-
-                        console.log(`REGISTERED for ${parsed_headers.Contact.expires} seconds`);
-                        setTimeout(() => {
-                            let tag = parsed_headers.From.tag;
-                            let branch = parsed_headers.Via.branch;
-                            props.callId = SIP.Builder.generateBranch();
-                            this.register(props, client_callback);
-                        }, parsed_headers.Contact.expires * 1000);
-                        this.status = 'REGISTERED';
-                        client_callback({type:'REGISTERED', message:d})
-                    }else if(d.statusCode == 401){
-                        let challenge_data = SIP.Parser.ParseHeaders(d.headers)['WWW-Authenticate'];
-                        sendRegister(challenge_data, false);
-                    }else if(d.statusCode == 403){
-                        console.log(`${d.statusCode} ${d.statusText}`);
-                        client_callback({type:'REGISTER_FAILED', message:d})
-                    }else if(d.statusCode == 407){
-                        let challenge_data = SIP.Parser.ParseHeaders(d.headers)['Proxy-Authenticate'];
-                        sendRegister(challenge_data, true);
-                    }else{
-                        console.log('Unexpected status code:', d.statusCode);
+                challenge_data: challenge_data || undefined,
+                proxy_auth: proxy_auth,
+                username: this.username,
+                password: this.register_password,
+                expires: 3600,
+            }), (response) => {
+                if(!response || typeof response.statusCode !== 'number'){
+                    fail({statusCode:408, statusText:'No SIP response'});
+                    return;
+                }
+                if(response.statusCode === 200){
+                    succeed(response);
+                    return;
+                }
+                if(response.statusCode === 401 || response.statusCode === 407){
+                    var parsed_headers = SIP.Parser.ParseHeaders(response.headers);
+                    var challenge_data = (response.statusCode === 401)
+                        ? parsed_headers['WWW-Authenticate']
+                        : parsed_headers['Proxy-Authenticate'];
+                    var new_proxy_auth = (response.statusCode === 407);
+                    if(!challenge_data){
+                        fail(response);
+                        return;
                     }
-                })
-            })
-        }
+                    sendAttempt(challenge_data, new_proxy_auth);
+                    return;
+                }
+                if(response.statusCode === 403){
+                    console.log(`${response.statusCode} ${response.statusText}`);
+                    client_callback({type:'REGISTER_FAILED', message:response});
+                    return;
+                }
+                console.log('Unexpected status code:', response.statusCode);
+                fail(response);
+            });
+        };
 
-        sendRegister();
+        sendAttempt(null, false);
     }
 
     uac_init_call(props){
@@ -732,7 +771,7 @@ class VOIP{
                     return;
                 }else if (response.statusCode == 401 || response.statusCode == 407) {
                     let challenge_data = (response.statusCode == 401) ? SIP.Parser.ParseHeaders(response.headers)['WWW-Authenticate'] : SIP.Parser.ParseHeaders(response.headers)['Proxy-Authenticate'];
-                    sendInvite(challenge_data, false);
+                    sendInvite(challenge_data, response.statusCode === 407);
                 }else{
                     props.client_callback({type: response.statusCode || response.method, message: response, generated_branch: h.branchId, generated_tag: h.from_tag, sdp: response.body});
                 }
