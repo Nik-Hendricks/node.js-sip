@@ -105,6 +105,7 @@ const client = new VOIP({
   register_password: cfg.password,
   register_ip: cfg.server,
   register_port: cfg.port,
+  auto_ack: false,
   transport: {
     type: 'udp4',
     port: cfg.localPort,

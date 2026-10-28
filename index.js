@@ -808,6 +808,7 @@ class VOIP{
     uac_init_call(props){
         var cseq = 1;
         var try_count = 0;
+        if (props.auto_ack === undefined) props.auto_ack = true;
 
         var h = {
             'Via': { uri: { ip: this.transport.ip, port: this.transport.port }, branch: props.branch },
@@ -821,22 +822,31 @@ class VOIP{
 
 
         let inviteTimer = null;
+        let retransmissionTimer = null;
+        let completed = false;
         const armInviteTimer = () => {
             if (inviteTimer) clearTimeout(inviteTimer);
             inviteTimer = setTimeout(() => {
+                if (completed) return;
                 console.log('INVITE timed out waiting for a response');
                 props.client_callback({type:'CALL_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
             }, 10000);
         };
 
+        const clearInviteTimers = () => {
+            if (inviteTimer) { clearTimeout(inviteTimer); inviteTimer = null; }
+            if (retransmissionTimer) { clearTimeout(retransmissionTimer); retransmissionTimer = null; }
+        };
+
         const sendInvite = (challenge_headers, proxy_auth = false) => {
             try_count++;
             if(try_count > this.max_retries){
-                if (inviteTimer) clearTimeout(inviteTimer);
+                clearInviteTimers();
                 console.log('Max retries reached');
                 props.client_callback({type:'CALL_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
                 return;
             }
+            if (retransmissionTimer) { clearTimeout(retransmissionTimer); retransmissionTimer = null; }
             
             let inv_message = SIP.Builder.SIPMessageObject({
                 isResponse: false,
@@ -863,17 +873,59 @@ class VOIP{
                 }
             }
 
+            if (props.retransmit === true && retransmissionTimer === null) {
+                let nextDelay = 500;
+                retransmissionTimer = setTimeout(() => {
+                    retransmissionTimer = null;
+                    if (completed) return;
+                    console.log('Retransmitting INVITE to ' + props.ip + ':' + props.port);
+                    sendInvite(challenge_headers, proxy_auth);
+                }, nextDelay);
+            }
+
             if(this.server_uac == true){
                 this.server_send(inv_message, props.ip, props.port, (response) => {
-                    if (inviteTimer) clearTimeout(inviteTimer);
+                    clearInviteTimers();
                     if (!response || typeof response.statusCode !== 'number') return;
-                    responses(response)
+                    if (completed) return;
+                    completed = response.statusCode >= 200 && response.statusCode < 300;
+                    responses(response);
+                    if (completed && props.auto_ack === true) {
+                        this.ack({
+                            to: props.to,
+                            ip: props.ip,
+                            port: props.port,
+                            from: props.username,
+                            to_tag: (SIP.Parser.ParseHeaders(response.headers)).To.tag,
+                            from_tag: props.from_tag,
+                            branch: props.branch,
+                            callId: props.callId,
+                            cseq: 1,
+                            requestUri: `sip:${props.to}@${props.ip}:${props.port}`,
+                        });
+                    }
                 });
             }else{
                 this.send(inv_message, (response) => {
-                    if (inviteTimer) clearTimeout(inviteTimer);
+                    clearInviteTimers();
                     if (!response || typeof response.statusCode !== 'number') return;
-                    responses(response)
+                    if (completed) return;
+                    completed = response.statusCode >= 200 && response.statusCode < 300;
+                    responses(response);
+                    if (completed && props.auto_ack === true) {
+                        this.ack({
+                            to: props.to,
+                            ip: props.ip,
+                            port: props.port,
+                            from: props.username,
+                            to_tag: (SIP.Parser.ParseHeaders(response.headers)).To.tag,
+                            from_tag: props.from_tag,
+                            branch: props.branch,
+                            callId: props.callId,
+                            cseq: 1,
+                            requestUri: `sip:${props.to}@${props.ip}:${props.port}`,
+                        });
+                    }
                 });
             }
         }
