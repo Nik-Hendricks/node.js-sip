@@ -110,6 +110,7 @@ let audioState = 'main';
 let acknowledged = false;
 let finished = false;
 let hangupTimer = null;
+let statsTimer = null;
 
 function playState(state, key) {
   const prompt = PROMPTS[state] || PROMPTS.main;
@@ -200,6 +201,9 @@ const client = new VOIP({
               requestUri: 'sip:' + cfg.target + '@' + ip + ':' + port,
             });
             console.log('ACK sent to ' + ip + ':' + port);
+            statsTimer = setInterval(() => {
+              console.log('Inbound RTP stats:', JSON.stringify(rtpSession.rtpStats()));
+            }, 3000);
 
             if (response.message && response.message.body) {
               try {
@@ -261,6 +265,7 @@ function hangup(ip, port, headers) {
 }
 
 function finish(code) {
+  if (statsTimer) { clearInterval(statsTimer); statsTimer = null; }
   if (finished) return;
   finished = true;
   try { rtpSession.stop(); } catch (e) {}

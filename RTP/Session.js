@@ -142,6 +142,7 @@ class Session{
             '-payload_type', selected_codec.id,
             '-f', 'rtp', `rtp://${parsed_sdp.ip}:${parsed_sdp.port}`);
 
+        console.log(`[RTP] outbound target=${parsed_sdp.ip}:${parsed_sdp.port} codec=${selected_codec.name} audio=${this.audio_file}`);
         let ffmpeg = spawn('ffmpeg', args);
         ffmpeg.stdout.on('data', (data) => { console.log(`stdout: ${data}`); });
         ffmpeg.stderr.on('data', (data) => { console.error(`stderr: ${data}`); });
