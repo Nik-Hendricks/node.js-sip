@@ -459,6 +459,9 @@ class VOIP{
 
         const existing_invite = (this.pending_invites || {})[root_invite_headers['Call-ID']];
         if(existing_invite){
+            if (existing_invite.session && typeof existing_invite.session.update === 'function' && root_invite_body) {
+                try { existing_invite.session.update(root_invite_body); } catch(e) {}
+            }
             let client_ip = root_invite_headers.Contact.contact.ip;
             let client_port = root_invite_headers.Contact.contact.port;
             let body = (existing_invite.session && existing_invite.session.listen_sdp) ? existing_invite.session.listen_sdp : (root_invite_body || '');

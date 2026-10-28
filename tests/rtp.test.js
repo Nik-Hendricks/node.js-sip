@@ -28,3 +28,21 @@ test('RTP session receives packets and reports stats', async () => {
   assert.ok(stats.received_packets >= 1, 'expected at least one RTP packet');
   socket.close();
 });
+
+test('RTP session supports re-INVITE-style update', async () => {
+  const manager = new RTP.SessionManager();
+  const sdp = [
+    'v=0',
+    'o=z 0 1 IN IP4 127.0.0.1',
+    's=z',
+    'c=IN IP4 127.0.0.1',
+    't=0 0',
+    'm=audio 9999 RTP/AVP 0',
+    'a=rtpmap:0 PCMU/8000',
+  ].join('\n');
+  const session = manager.new_session({ call_id: 'rtp-update-test', sdp, callback: () => {} });
+  const result = session.update(sdp);
+  assert.ok(result && result.type === 'SESSION_UPDATED');
+  session.stop();
+  manager.remove_session('rtp-update-test');
+});

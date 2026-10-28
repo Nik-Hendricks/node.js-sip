@@ -128,6 +128,65 @@ class Session{
         return this;
     }
 
+    update(new_sdp){
+        if (typeof new_sdp === 'string' && new_sdp.trim()) {
+            this.sdp = new_sdp;
+        }
+
+        let parsed_sdp;
+        try {
+            parsed_sdp = Parser.parse(this.sdp);
+        } catch (e) {
+            console.error('Session update failed to parse SDP:', e && e.message ? e.message : e);
+            return {type: 'SESSION_ERROR', error: e};
+        }
+        if (!parsed_sdp || !parsed_sdp.ip || !parsed_sdp.port || !Array.isArray(parsed_sdp.codecs) || parsed_sdp.codecs.length === 0) {
+            return {type: 'SESSION_ERROR', error: new Error('invalid SDP')};
+        }
+
+        if (this.ffmpeg && typeof this.ffmpeg.kill === 'function') {
+            try { this.ffmpeg.kill('SIGKILL'); } catch (e) { /* ignore */ }
+            try { if (this.ffmpeg.stdout) this.ffmpeg.stdout.destroy(); } catch (e) { /* ignore */ }
+            try { if (this.ffmpeg.stderr) this.ffmpeg.stderr.destroy(); } catch (e) { /* ignore */ }
+            try { this.ffmpeg.unref(); } catch (e) { /* ignore */ }
+        }
+        this.ffmpeg = null;
+
+        let selected_codec = parsed_sdp.codecs[0];
+        if (selected_codec && selected_codec.name == 'telephone-event' && parsed_sdp.codecs[1]) {
+            selected_codec = parsed_sdp.codecs[1];
+        }
+        parsed_sdp.codecs.forEach(codec => {
+            if (codec.name == 'opus') selected_codec = codec;
+        });
+        if (selected_codec.name != 'opus') {
+            parsed_sdp.codecs.forEach(codec => {
+                if (codec.name == 'G729') selected_codec = codec;
+            });
+        }
+
+        let ffmpeg = spawn('ffmpeg', [
+            '-re',
+            '-i', require('path').join(__dirname, '..', 'sounds', 'test.mp3'),
+            '-acodec', selected_codec.codec,
+            '-ar', selected_codec.rate,
+            '-ac', selected_codec.channels,
+            '-payload_type', selected_codec.id,
+            '-f', 'rtp', `rtp://${parsed_sdp.ip}:${parsed_sdp.port}`
+        ]);
+        ffmpeg.stdout.on('data', (data) => { console.log(`stdout: ${data}`); });
+        ffmpeg.stderr.on('data', (data) => { console.error(`stderr: ${data}`); });
+        this.ffmpeg = ffmpeg;
+        if (this.ffmpeg && typeof this.ffmpeg.unref === 'function') this.ffmpeg.unref();
+
+        return {
+            type: 'SESSION_UPDATED',
+            remote_ip: parsed_sdp.ip,
+            remote_port: parsed_sdp.port,
+            codec: selected_codec.name,
+        };
+    }
+
     rtpStats(){
         return {
             received_packets: this.received_packets,
