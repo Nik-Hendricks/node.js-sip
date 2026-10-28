@@ -104,6 +104,18 @@ class VOIP{
                     port: props.callee_endpoint.endpoint.port,
                     body: props.root_invite_body,
                     client_callback: (root_response) => {
+                        let pending = this.pending_invites && this.pending_invites[props.root_invite_headers['Call-ID']];
+                        if (pending && pending.cancelled) {
+                            console.log('EXTENSION BEHAVIOR: INVITE already cancelled');
+                            this.server_send(SIP.Builder.SIPMessageObject({
+                                isResponse: true,
+                                statusCode: 487,
+                                statusText: 'Request Terminated',
+                                headers: SIP.Parser.ParseHeaders({ ...root_response.message.headers }),
+                            }), props.caller_endpoint.endpoint.ip, props.caller_endpoint.endpoint.port);
+                            return;
+                        }
+
                         let m = {...root_response.message};
                         m.headers = SIP.Parser.ParseHeaders(m.headers);
                         this.server_send(SIP.Builder.SIPMessageObject(m), props.caller_endpoint.endpoint.ip, props.caller_endpoint.endpoint.port, (d) => {
@@ -606,6 +618,7 @@ class VOIP{
         let parsed_headers = SIP.Parser.ParseHeaders(msg.headers);
         let call_id = parsed_headers['Call-ID'];
         let pending = (this.pending_invites || {})[call_id];
+        if (pending) pending.cancelled = true;
         let client_ip = (parsed_headers.Contact && parsed_headers.Contact.contact) ? parsed_headers.Contact.contact.ip : null;
         let client_port = (parsed_headers.Contact && parsed_headers.Contact.contact) ? parsed_headers.Contact.contact.port : null;
         if (pending && pending.callee_endpoint && pending.callee_endpoint.type === 'extension' && pending.callee_endpoint.endpoint) {
@@ -867,6 +880,29 @@ class VOIP{
 
         armInviteTimer();
         sendInvite();
+    }
+
+    cancel(props){
+        props = props || {};
+        const headers = (typeof props.headers === 'object' && props.headers !== null) ? props.headers : {
+            'Via': { uri: { ip: this.transport.ip, port: this.transport.port }, branch: props.branch || SIP.Builder.generateBranch() },
+            'To': { contact: { username: props.to, ip: props.ip, port: props.port } },
+            'From': { contact: { username: props.from || this.username, ip: this.transport.ip, port: this.transport.port }, tag: props.from_tag },
+            'CSeq': { count: props.cseq || 1, method: 'CANCEL' },
+            'Call-ID': props.callId,
+        };
+        const message = SIP.Builder.SIPMessageObject({
+            isResponse: false,
+            method: 'CANCEL',
+            requestUri: props.requestUri || `sip:${props.to}@${props.ip}:${props.port}`,
+            headers: headers,
+        });
+        if (props.ip && props.port) {
+            this.server_send(message, props.ip, props.port, props.callback);
+        } else {
+            this.send(message, props.callback);
+        }
+        return message;
     }
 
     response(props){
