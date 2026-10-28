@@ -31,6 +31,7 @@ loadDotEnv(path.join(__dirname, '..', '.env'));
 
 const VOIP = require('../index.js');
 const SIP = require('../SIP');
+const RTP = require('../RTP');
 const utils = require('../utils.js');
 
 const cfg = {
@@ -61,6 +62,7 @@ let finished = false;
 function finish(code) {
   if (finished) return;
   finished = true;
+  try { rtpSession.stop(); } catch (e) {}
   console.log('Exiting with code ' + code);
   process.exit(code);
 }
@@ -72,7 +74,7 @@ function makeSdp(callId) {
     's=node.js-sip env test',
     'c=IN IP4 ' + cfg.localIp,
     't=0 0',
-    'm=audio ' + cfg.audioPort + ' RTP/AVP 0 8 101',
+    'm=audio ' + rtpSession.listen_port + ' RTP/AVP 0 8 101',
     'a=rtpmap:0 PCMU/8000',
     'a=rtpmap:8 PCMA/8000',
     'a=rtpmap:101 telephone-event/8000',
@@ -82,6 +84,20 @@ function makeSdp(callId) {
 
 const callId = 'env-test-' + Date.now();
 let hangupTimer = null;
+
+const rtpSession = new RTP.SessionManager().new_session({
+  call_id: 'env-rtp-test',
+  sdp: 'v=0\r\no=rtp 0 0 IN IP4 127.0.0.1\r\ns=rtp\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 9999 RTP/AVP 0\r\na=rtpmap:0 PCMU/8000\r\n',
+  dtmf_callback: (event) => {
+    console.log('DTMF detected:', event.digit, 'duration:', event.duration, 'end:', event.end);
+  },
+  callback: () => {},
+});
+rtpSession.start();
+rtpSession.dtmf((event) => {
+  console.log('DTMF event:', event.digit, 'end:', event.end);
+});
+
 
 const client = new VOIP({
   type: 'client',
@@ -171,11 +187,13 @@ const client = new VOIP({
 
 setTimeout(() => {
   console.error('Test timed out');
+  try { rtpSession.stop(); } catch (e) {}
   finish(1);
 }, cfg.timeout + 5000);
 
 process.on('SIGINT', () => {
   console.log('Interrupted by user');
   if (hangupTimer) clearTimeout(hangupTimer);
+  try { rtpSession.stop(); } catch (e) {}
   finish(0);
 });

@@ -21,9 +21,11 @@ class Session{
         this.received_bytes = 0;
         this.last_packet_at = null;
         this.on_packet = null;
+        this._last_dtmf_end = null;
         this.telephone_event_payload_types = new Set();
         this.dtmf_events = [];
         this.on_dtmf = null;
+        this._last_dtmf_end = null;
         if (typeof props.dtmf_callback === 'function') {
             this.on_dtmf = props.dtmf_callback;
         }
@@ -122,6 +124,7 @@ class Session{
             this.rtp_socket = null;
         }
         this.on_packet = null;
+        this._last_dtmf_end = null;
         if (this.ffmpeg && typeof this.ffmpeg.kill === 'function') {
             try { this.ffmpeg.kill('SIGKILL'); } catch (e) { /* ignore */ }
             try { if (this.ffmpeg.stdout) this.ffmpeg.stdout.destroy(); } catch (e) { /* ignore */ }
@@ -237,8 +240,21 @@ class Session{
             port: rinfo.port,
         };
 
-        // Only emit completed events; RFC 2833 repeats the event and sets END on final packets.
+        const rtpTimestamp = (msg.length > 7)
+            ? ((msg[4] << 24) >>> 0) + ((msg[5] << 16) >>> 0) + ((msg[6] << 8) >>> 0) + (msg[7] >>> 0)
+            : 0;
+        const signature = `${eventCode}:${duration}:${rtpTimestamp}`;
+        event.rtpTimestamp = rtpTimestamp;
+        event.signature = signature;
+
+        // RFC 2833 repeats completed events; suppress exact retransmissions while allowing
+        // genuinely separate presses of the same digit.
         if (endBit) {
+            const now = Date.now();
+            if (this._last_dtmf_end && this._last_dtmf_end.signature === signature && (now - this._last_dtmf_end.time) < 300) {
+                return;
+            }
+            this._last_dtmf_end = {signature, time: now};
             this.dtmf_events.push(event);
             if (typeof this.on_dtmf === 'function') {
                 try { this.on_dtmf(event); } catch (e) {}
