@@ -63,7 +63,6 @@ const Builder = {
             ret.headers.Contact = ret.headers.Contact + `;expires=${props.expires}`;
         }
 
-        console.log(ret)
         return ret;
     },
 

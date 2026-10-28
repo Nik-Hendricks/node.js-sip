@@ -358,7 +358,6 @@ class VOIP{
         let client_username = parsed_headers.Contact.contact.username;
         let client_ip = parsed_headers.Contact.contact.ip;
         let client_port = parsed_headers.Contact.contact.port;
-        console.log(parsed_headers)
 
         if(this.UserManager.items[client_username] !== undefined){
             this.UserManager.items[client_username].ip = client_ip;
@@ -808,9 +807,19 @@ class VOIP{
         }
 
 
+        let inviteTimer = null;
+        const armInviteTimer = () => {
+            if (inviteTimer) clearTimeout(inviteTimer);
+            inviteTimer = setTimeout(() => {
+                console.log('INVITE timed out waiting for a response');
+                props.client_callback({type:'CALL_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
+            }, 10000);
+        };
+
         const sendInvite = (challenge_headers, proxy_auth = false) => {
             try_count++;
             if(try_count > this.max_retries){
+                if (inviteTimer) clearTimeout(inviteTimer);
                 console.log('Max retries reached');
                 props.client_callback({type:'CALL_FAILED', message:{statusCode:408, statusText:'Request Timeout'}});
                 return;
@@ -834,6 +843,7 @@ class VOIP{
                     return;
                 }else if (response.statusCode == 401 || response.statusCode == 407) {
                     let challenge_data = (response.statusCode == 401) ? SIP.Parser.ParseHeaders(response.headers)['WWW-Authenticate'] : SIP.Parser.ParseHeaders(response.headers)['Proxy-Authenticate'];
+                    armInviteTimer();
                     sendInvite(challenge_data, response.statusCode === 407);
                 }else{
                     props.client_callback({type: response.statusCode || response.method, message: response, generated_branch: h.branchId, generated_tag: h.from_tag, sdp: response.body});
@@ -842,15 +852,20 @@ class VOIP{
 
             if(this.server_uac == true){
                 this.server_send(inv_message, props.ip, props.port, (response) => {
+                    if (inviteTimer) clearTimeout(inviteTimer);
+                    if (!response || typeof response.statusCode !== 'number') return;
                     responses(response)
                 });
             }else{
                 this.send(inv_message, (response) => {
+                    if (inviteTimer) clearTimeout(inviteTimer);
+                    if (!response || typeof response.statusCode !== 'number') return;
                     responses(response)
                 });
             }
         }
 
+        armInviteTimer();
         sendInvite();
     }
 
