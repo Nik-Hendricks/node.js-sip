@@ -74,29 +74,34 @@ class Session{
         return this._spawnOutbound();
     }
 
+    _killOutboundSync(){
+        if (this.ffmpeg && typeof this.ffmpeg.pid === 'number') {
+            try { process.kill(this.ffmpeg.pid, 'SIGKILL'); } catch (e) { /* ignore */ }
+            const deadline = Date.now() + 100;
+            while (true) {
+                try {
+                    process.kill(this.ffmpeg.pid, 0);
+                } catch (e) {
+                    // Process no longer exists.
+                    break;
+                }
+                if (Date.now() >= deadline) {
+                    try { process.kill(this.ffmpeg.pid, 'SIGKILL'); } catch (e) { /* ignore */ }
+                    break;
+                }
+            }
+        }
+        if (this.ffmpeg) {
+            try { if (this.ffmpeg.stdout) this.ffmpeg.stdout.destroy(); } catch (e) { /* ignore */ }
+            try { if (this.ffmpeg.stderr) this.ffmpeg.stderr.destroy(); } catch (e) { /* ignore */ }
+            try { this.ffmpeg.unref(); } catch (e) { /* ignore */ }
+        }
+        this.ffmpeg = null;
+        this._outboundProcess = null;
+    }
+
     _spawnOutbound(){
-        if (this._outboundProcess && typeof this._outboundProcess.kill === 'function' && this._outboundProcess !== this.ffmpeg) {
-            try { this._outboundProcess.kill('SIGKILL'); } catch (e) { /* ignore */ }
-            this._outboundProcess = null;
-        }
-        if (this.ffmpeg && typeof this.ffmpeg.kill === 'function') {
-            const processToStop = this.ffmpeg;
-            this.ffmpeg = null;
-            let finished = false;
-            const complete = () => {
-                if (finished) return;
-                finished = true;
-                try { if (processToStop.stdout) processToStop.stdout.destroy(); } catch (e) { /* ignore */ }
-                try { if (processToStop.stderr) processToStop.stderr.destroy(); } catch (e) { /* ignore */ }
-                try { processToStop.unref(); } catch (e) { /* ignore */ }
-                this._spawnOutbound();
-            };
-            processToStop.once('exit', () => setTimeout(complete, 0));
-            processToStop.once('error', () => setTimeout(complete, 0));
-            try { processToStop.kill('SIGKILL'); } catch (e) { /* ignore */ }
-            setTimeout(complete, 25);
-            return {type: 'SESSION_OUTBOUND_STARTING', remote_ip: null, remote_port: null, codec: null, audio_file: this.audio_file};
-        }
+        this._killOutboundSync();
 
         let parsed_sdp;
         try {
@@ -111,14 +116,6 @@ class Session{
             if (this.callback) this.callback({type: 'SESSION_ERROR', error: new Error('invalid SDP')});
             return {type: 'SESSION_ERROR', error: new Error('invalid SDP')};
         }
-
-        if (this.ffmpeg && typeof this.ffmpeg.kill === 'function') {
-            try { this.ffmpeg.kill('SIGKILL'); } catch (e) { /* ignore */ }
-            try { if (this.ffmpeg.stdout) this.ffmpeg.stdout.destroy(); } catch (e) { /* ignore */ }
-            try { if (this.ffmpeg.stderr) this.ffmpeg.stderr.destroy(); } catch (e) { /* ignore */ }
-            try { this.ffmpeg.unref(); } catch (e) { /* ignore */ }
-        }
-        this.ffmpeg = null;
 
         let selected_codec = parsed_sdp.codecs[0];
         if (selected_codec && selected_codec.name == 'telephone-event' && parsed_sdp.codecs[1]) {
@@ -145,8 +142,8 @@ class Session{
 
         console.log(`[RTP] outbound target=${parsed_sdp.ip}:${parsed_sdp.port} codec=${selected_codec.name} audio=${this.audio_file}`);
         let ffmpeg = spawn('ffmpeg', args);
-        ffmpeg.stdout.on('data', (data) => { console.log(`stdout: ${data}`); });
-        ffmpeg.stderr.on('data', (data) => { console.error(`stderr: ${data}`); });
+        ffmpeg.stdout.on('data', (data) => { console.log(`stdout: ${data}`.trim()); });
+        ffmpeg.stderr.on('data', (data) => { console.error(`stderr: ${data.toString().trim()}`); });
         this.ffmpeg = ffmpeg;
         this._outboundProcess = ffmpeg;
         if (this.ffmpeg && typeof this.ffmpeg.unref === 'function') this.ffmpeg.unref();
@@ -161,13 +158,16 @@ class Session{
         }
         this.on_packet = null;
         this._last_dtmf_end = null;
-        if (this.ffmpeg && typeof this.ffmpeg.kill === 'function') {
-            try { this.ffmpeg.kill('SIGKILL'); } catch (e) { /* ignore */ }
+        if (this.ffmpeg && typeof this.ffmpeg.pid === 'number') {
+            try { process.kill(this.ffmpeg.pid, 'SIGKILL'); } catch (e) { /* ignore */ }
+        }
+        if (this.ffmpeg) {
             try { if (this.ffmpeg.stdout) this.ffmpeg.stdout.destroy(); } catch (e) { /* ignore */ }
             try { if (this.ffmpeg.stderr) this.ffmpeg.stderr.destroy(); } catch (e) { /* ignore */ }
             try { this.ffmpeg.unref(); } catch (e) { /* ignore */ }
         }
         this.ffmpeg = null;
+        this._outboundProcess = null;
     }
 
     receive(callback){
