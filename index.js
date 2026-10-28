@@ -128,6 +128,13 @@ class VOIP{
                 let s = this.SessionManager.new_session({
                     call_id: props.root_invite_headers['Call-ID'],
                     sdp: props.root_invite_body,
+                    dtmf_callback: (event) => {
+                        console.log('IVR DTMF:', event.digit, 'duration:', event.duration);
+                        let ivr = this.IVRManager.items && this.IVRManager.items[props.callee_endpoint.endpoint.name];
+                        if (ivr && typeof ivr.handle_dtmf === 'function') {
+                            // Keep the legacy hook available; it is intentionally a no-op unless explicitly used.
+                        }
+                    },
                     callback: (d) => {
                         if(d.type == 'SESSION_STARTED'){
                             h['Content-Type'] = 'application/sdp';

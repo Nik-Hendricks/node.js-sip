@@ -21,6 +21,13 @@ class Session{
         this.received_bytes = 0;
         this.last_packet_at = null;
         this.on_packet = null;
+        this.telephone_event_payload_types = new Set();
+        this.dtmf_events = [];
+        this.on_dtmf = null;
+        if (typeof props.dtmf_callback === 'function') {
+            this.on_dtmf = props.dtmf_callback;
+        }
+        this._parseTelephoneEventTypes(this.listen_sdp);
     }
 
     start(){
@@ -95,6 +102,7 @@ class Session{
             if (typeof this.on_packet === 'function') {
                 try { this.on_packet({type:'RTP_PACKET', size: msg.length, from: rinfo.address, port: rinfo.port, time: this.last_packet_at}); } catch(e) {}
             }
+            this._handleRtpPacket(msg, rinfo);
         });
 
         const finishStart = () => {
@@ -196,6 +204,58 @@ class Session{
             listen_port: this.listen_port,
         };
     }
+
+    _parseTelephoneEventTypes(sdp){
+        this.telephone_event_payload_types.clear();
+        if (typeof sdp !== 'string') return;
+        const lines = sdp.split('\n');
+        for (const line of lines) {
+            const listenMatch = line.match(/a=rtpmap:(\d+) telephone-event\//i);
+            if (listenMatch) this.telephone_event_payload_types.add(parseInt(listenMatch[1], 10));
+        }
+    }
+
+    _handleRtpPacket(msg, rinfo){
+        if (!Buffer.isBuffer(msg) || msg.length < 16) return;
+        const pt = msg[1] & 0x7f;
+        if (!this.telephone_event_payload_types.has(pt)) return;
+
+        const eventCode = msg[12];
+        const endBit = (msg[13] & 0x80) !== 0;
+        const volume = msg[13] & 0x3f;
+        const duration = (msg[14] << 8) | msg[15];
+        const seq = (msg[2] << 8) | msg[3];
+        const event = {
+            type: 'DTMF',
+            eventCode,
+            digit: this._dtmfDigit(eventCode),
+            end: endBit,
+            volume,
+            duration,
+            sequence: seq,
+            from: rinfo.address,
+            port: rinfo.port,
+        };
+
+        // Only emit completed events; RFC 2833 repeats the event and sets END on final packets.
+        if (endBit) {
+            this.dtmf_events.push(event);
+            if (typeof this.on_dtmf === 'function') {
+                try { this.on_dtmf(event); } catch (e) {}
+            }
+        }
+    }
+
+    _dtmfDigit(code){
+        const mapping = ['0','1','2','3','4','5','6','7','8','9','*','#','A','B','C','D'];
+        return mapping[code] || String(code);
+    }
+
+    dtmf(callback){
+        this.on_dtmf = (typeof callback === 'function') ? callback : null;
+        return this;
+    }
+
 
     listen(){
         //use ffplay to listen to the stream
