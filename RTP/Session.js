@@ -19,6 +19,17 @@ class Session{
             this.listen_ip = ipMatch ? ipMatch[1] : null;
         }
         this.rtp_socket = null;
+        this.outbound_socket = null;
+        this.outbound_interval = null;
+        this.rtcp_timer = null;
+        this.outbound_ssrc = (Math.random() * 0xffffffff) >>> 0;
+        this.outbound_seq = 0;
+        this.outbound_timestamp = 0;
+        this.outbound_packet_count = 0;
+        this.outbound_octet_count = 0;
+        this.outbound_rtcp_port = null;
+        this.outbound_offset = 0;
+        this.outbound_source = null;
         this.received_packets = 0;
         this.received_bytes = 0;
         this.last_packet_at = null;
@@ -95,10 +106,93 @@ class Session{
         }
         this.ffmpeg = null;
         this._outboundProcess = null;
+        if (this.outbound_interval) { clearInterval(this.outbound_interval); this.outbound_interval = null; }
+        if (this.rtcp_timer) { clearInterval(this.rtcp_timer); this.rtcp_timer = null; }
+        if (this.outbound_socket) {
+            try { this.outbound_socket.close(); } catch (e) { /* ignore */ }
+        }
+        this.outbound_socket = null;
+        this.outbound_offset = 0;
+    }
+
+    _startRawOutbound(parsed_sdp){
+        const fs = require('fs');
+        const dgram = require('dgram');
+        let audio;
+        try { audio = fs.readFileSync(this.audio_file); } catch (e) {
+            console.error('Unable to read raw uLaw media data:', e && e.message ? e.message : e);
+            if (this.callback) this.callback({type: 'SESSION_ERROR', error: e});
+            return;
+        }
+        if (!Buffer.isBuffer(audio) || audio.length === 0) {
+            console.error('Raw uLaw media file is empty:', this.audio_file);
+            return;
+        }
+        this.outbound_offset = 0;
+        this.outbound_packet_count = 0;
+        this.outbound_octet_count = 0;
+        const socket = dgram.createSocket('udp4');
+        this.outbound_socket = socket;
+        const targetIp = parsed_sdp.ip;
+        const targetPort = parsed_sdp.port;
+        const sendOne = () => {
+            if (!this.outbound_socket || !Buffer.isBuffer(audio) || audio.length === 0) return;
+            const payloadSize = 160;
+            const payload = Buffer.allocUnsafe(payloadSize);
+            for (let i = 0; i < payloadSize; i++) {
+                payload[i] = audio[(this.outbound_offset + i) % audio.length];
+            }
+            this.outbound_offset = (this.outbound_offset + payloadSize) % audio.length;
+            const packet = Buffer.allocUnsafe(12 + payload.length);
+            packet[0] = 0x80;
+            packet[1] = 0;
+            packet.writeUInt16BE(this.outbound_seq & 0xffff, 2);
+            packet.writeUInt32BE(this.outbound_timestamp >>> 0, 4);
+            packet.writeUInt32BE(this.outbound_ssrc >>> 0, 8);
+            payload.copy(packet, 12);
+            try { socket.send(packet, 0, packet.length, targetPort, targetIp); } catch (e) { /* ignore */ }
+            this.outbound_seq = (this.outbound_seq + 1) & 0xffff;
+            this.outbound_timestamp = (this.outbound_timestamp + 160) >>> 0;
+            this.outbound_packet_count++;
+            this.outbound_octet_count += payload.length;
+        };
+        sendOne();
+        this.outbound_interval = setInterval(sendOne, 20);
+        if (typeof this.outbound_interval?.unref === 'function') this.outbound_interval.unref();
+        if (this.outbound_rtcp_port && this.outbound_rtcp_port > 0) {
+            this.rtcp_timer = setInterval(() => {
+                if (!this.outbound_socket) return;
+                const rtcp = Buffer.allocUnsafe(28);
+                rtcp[0] = 0x80;
+                rtcp[1] = 200;
+                rtcp.writeUInt16BE(6, 2);
+                rtcp.writeUInt32BE(this.outbound_ssrc >>> 0, 4);
+                const now = Date.now();
+                rtcp.writeUInt32BE(Math.floor((now / 1000) * 0xFFFFFFFF) + 2208988800, 8);
+                rtcp.writeUInt32BE((now % 1000) * 0x100000, 12);
+                rtcp.writeUInt32BE(this.outbound_timestamp >>> 0, 16);
+                rtcp.writeUInt32BE(this.outbound_packet_count >>> 0, 20);
+                rtcp.writeUInt32BE(this.outbound_octet_count >>> 0, 24);
+                try { socket.send(rtcp, 0, rtcp.length, this.outbound_rtcp_port, targetIp); } catch (e) { /* ignore */ }
+            }, 5000);
+            if (typeof this.rtcp_timer?.unref === 'function') this.rtcp_timer.unref();
+        }
     }
 
     _spawnOutbound(){
         this._killOutboundSync();
+
+        if (typeof this.audio_file === 'string' && this.audio_file.endsWith('.ulaw')) {
+            let parsed_sdp;
+            try { parsed_sdp = Parser.parse(this.sdp); } catch (e) { return {type:'SESSION_ERROR', error:e}; }
+            if (!parsed_sdp || !parsed_sdp.ip || !parsed_sdp.port || !Array.isArray(parsed_sdp.codecs) || parsed_sdp.codecs.length === 0) {
+                return {type:'SESSION_ERROR', error:new Error('invalid SDP')};
+            }
+            const rtcpMatch = this.sdp.match(/a=rtcp:(\d+)/i);
+            this.outbound_rtcp_port = rtcpMatch ? parseInt(rtcpMatch[1],10) : parsed_sdp.port + 1;
+            this._startRawOutbound(parsed_sdp);
+            return {type: 'SESSION_OUTBOUND_STARTED', remote_ip: parsed_sdp.ip, remote_port: parsed_sdp.port, codec: 'PCMU', audio_file: this.audio_file};
+        }
 
         let parsed_sdp;
         try {
@@ -164,6 +258,13 @@ class Session{
         }
         this.ffmpeg = null;
         this._outboundProcess = null;
+        if (this.outbound_interval) { clearInterval(this.outbound_interval); this.outbound_interval = null; }
+        if (this.rtcp_timer) { clearInterval(this.rtcp_timer); this.rtcp_timer = null; }
+        if (this.outbound_socket) {
+            try { this.outbound_socket.close(); } catch (e) { /* ignore */ }
+        }
+        this.outbound_socket = null;
+        this.outbound_offset = 0;
     }
 
     receive(callback){

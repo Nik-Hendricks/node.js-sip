@@ -57,13 +57,13 @@ for (const key of required) {
 }
 
 const PROMPTS = {
-  main: path.join(__dirname, 'ivr_prompts', 'main.wav'),
-  1: path.join(__dirname, 'ivr_prompts', 'sales.wav'),
-  2: path.join(__dirname, 'ivr_prompts', 'support.wav'),
-  3: path.join(__dirname, 'ivr_prompts', 'billing.wav'),
-  4: path.join(__dirname, 'ivr_prompts', 'accounting.wav'),
-  '*': path.join(__dirname, 'ivr_prompts', 'help.wav'),
-  invalid: path.join(__dirname, 'ivr_prompts', 'invalid.wav'),
+  main: path.join(__dirname, 'ivr_prompts', 'main.ulaw'),
+  1: path.join(__dirname, 'ivr_prompts', 'sales.ulaw'),
+  2: path.join(__dirname, 'ivr_prompts', 'support.ulaw'),
+  3: path.join(__dirname, 'ivr_prompts', 'billing.ulaw'),
+  4: path.join(__dirname, 'ivr_prompts', 'accounting.ulaw'),
+  '*': path.join(__dirname, 'ivr_prompts', 'help.ulaw'),
+  invalid: path.join(__dirname, 'ivr_prompts', 'invalid.ulaw'),
 };
 
 const callId = 'ivr-env-test-' + Date.now();
