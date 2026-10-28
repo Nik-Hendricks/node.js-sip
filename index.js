@@ -878,7 +878,6 @@ class VOIP{
                     console.log('400 Bad Request');
                     return;
                 }else if (response.method === 'BYE') {
-                    console.log('DEBUG UAC responding to inbound BYE');
                     let h = SIP.Parser.ParseHeaders(response.headers);
                     delete h['Content-Length'];
                     delete h['Content-Type'];
@@ -913,6 +912,10 @@ class VOIP{
                 this.server_send(inv_message, props.ip, props.port, (response) => {
                     clearInviteTimers();
                     if (!response) return;
+                    if (response.method === 'BYE') {
+                        responses(response);
+                        return;
+                    }
                     if (completed) return;
                     completed = (typeof response.statusCode === 'number' && response.statusCode >= 200 && response.statusCode < 300);
                     responses(response);
@@ -935,6 +938,10 @@ class VOIP{
                 this.send(inv_message, (response) => {
                     clearInviteTimers();
                     if (!response) return;
+                    if (response.method === 'BYE') {
+                        responses(response);
+                        return;
+                    }
                     if (completed) return;
                     completed = (typeof response.statusCode === 'number' && response.statusCode >= 200 && response.statusCode < 300);
                     responses(response);
