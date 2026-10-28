@@ -27,6 +27,7 @@ class Session{
         this.outbound_timestamp = 0;
         this.outbound_packet_count = 0;
         this.outbound_octet_count = 0;
+        this.outbound_send_count = 0;
         this.outbound_rtcp_port = null;
         this.outbound_offset = 0;
         this.outbound_source = null;
@@ -113,6 +114,7 @@ class Session{
         }
         this.outbound_socket = null;
         this.outbound_offset = 0;
+        this.outbound_send_count = 0;
     }
 
     _startRawOutbound(parsed_sdp){
@@ -154,10 +156,17 @@ class Session{
             this.outbound_seq = (this.outbound_seq + 1) & 0xffff;
             this.outbound_timestamp = (this.outbound_timestamp + 160) >>> 0;
             this.outbound_packet_count++;
+            this.outbound_send_count++;
             this.outbound_octet_count += payload.length;
         };
         sendOne();
         this.outbound_interval = setInterval(sendOne, 20);
+        console.log('[RTP] outbound raw stream started:', {
+            target: `${targetIp}:${targetPort}`,
+            rtcp: this.outbound_rtcp_port,
+            audio: this.audio_file,
+            bytes: Buffer.isBuffer(audio) ? audio.length : 0,
+        });
         if (typeof this.outbound_interval?.unref === 'function') this.outbound_interval.unref();
         if (this.outbound_rtcp_port && this.outbound_rtcp_port > 0) {
             this.rtcp_timer = setInterval(() => {
@@ -168,8 +177,10 @@ class Session{
                 rtcp.writeUInt16BE(6, 2);
                 rtcp.writeUInt32BE(this.outbound_ssrc >>> 0, 4);
                 const now = Date.now();
-                rtcp.writeUInt32BE(Math.floor((now / 1000) * 0xFFFFFFFF) + 2208988800, 8);
-                rtcp.writeUInt32BE((now % 1000) * 0x100000, 12);
+                const ntpSeconds = Math.floor(now / 1000) + 2208988800;
+                const ntpFraction = Math.floor(((now % 1000) / 1000) * 4294967296);
+                rtcp.writeUInt32BE(ntpSeconds >>> 0, 8);
+                rtcp.writeUInt32BE(ntpFraction >>> 0, 12);
                 rtcp.writeUInt32BE(this.outbound_timestamp >>> 0, 16);
                 rtcp.writeUInt32BE(this.outbound_packet_count >>> 0, 20);
                 rtcp.writeUInt32BE(this.outbound_octet_count >>> 0, 24);
@@ -265,6 +276,7 @@ class Session{
         }
         this.outbound_socket = null;
         this.outbound_offset = 0;
+        this.outbound_send_count = 0;
     }
 
     receive(callback){
@@ -295,6 +307,16 @@ class Session{
         };
     }
 
+    outboundStats(){
+        return {
+            outbound_socket: !!this.outbound_socket,
+            outbound_send_count: this.outbound_send_count,
+            outbound_packet_count: this.outbound_packet_count,
+            outbound_octet_count: this.outbound_octet_count,
+            outbound_target: `${this.sdp.match(/m=audio (\d+) RTP/)?.[0] || ''}`,
+            outbound_rtcp_port: this.outbound_rtcp_port,
+        };
+    }
     _parseTelephoneEventTypes(sdp){
         this.telephone_event_payload_types.clear();
         if (typeof sdp !== 'string') return;

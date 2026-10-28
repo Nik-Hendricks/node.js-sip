@@ -203,6 +203,7 @@ const client = new VOIP({
             console.log('ACK sent to ' + ip + ':' + port);
             statsTimer = setInterval(() => {
               console.log('Inbound RTP stats:', JSON.stringify(rtpSession.rtpStats()));
+              console.log('Outbound RTP stats:', JSON.stringify(rtpSession.outboundStats()));
             }, 3000);
 
             if (response.message && response.message.body) {
