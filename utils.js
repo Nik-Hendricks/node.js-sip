@@ -14,7 +14,7 @@ const UTILS = {
           }
         }
         
-        return null; // Return null if no IP address is found
+        return '127.0.0.1'; // Fallback when no external IPv4 interface is available
     },
 
     split_channels(data, channels){

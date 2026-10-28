@@ -41,7 +41,7 @@ const Builder = {
         if(props.headers['Content-Type']){
             ret.headers['Content-Type'] = props.headers['Content-Type'];
             if(props.body){
-                ret.headers['Content-Length'] = props.body.length;
+                ret.headers['Content-Length'] = Buffer.byteLength(String(props.body));
             }
         }
         if (props.challenge_data) {
@@ -71,7 +71,7 @@ const Builder = {
         }
         let message = '';
         if (obj.isResponse) {
-            message += `SIP/2.0 ${obj.statusCode} ${obj.statusText} ${(typeof obj.requestUri !== 'undefined') ? obj.requestUri.slice(obj.requestUri.indexOf(" ") + 1) : ""}\r\n`;
+            message += `SIP/2.0 ${obj.statusCode} ${obj.statusText}${(typeof obj.requestUri !== 'undefined') ? ' ' + obj.requestUri.slice(obj.requestUri.indexOf(" ") + 1) : ""}\r\n`;
         } else {
           message += `${obj.method} ${obj.requestUri} SIP/2.0\r\n`;
         }

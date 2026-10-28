@@ -13,7 +13,7 @@ const HeaderParser = {
             "CSeq": {count: HeaderParser.Cseq, method: HeaderParser.Cseq},
             "WWW-Authenticate": {realm: HeaderParser.Realm, nonce: HeaderParser.Nonce, algorithm: HeaderParser.Algorithm, qop: HeaderParser.Qop},
             "Proxy-Authenticate": {realm: HeaderParser.Realm, nonce: HeaderParser.Nonce, algorithm: HeaderParser.Algorithm, qop: HeaderParser.Qop},
-            "Authorization": {realm: HeaderParser.Realm, username: HeaderParser.Username, algorithm: HeaderParser.Algorithm, nonce: HeaderParser.Nonce, response: HeaderParser.Response},
+            "Authorization": {realm: HeaderParser.Realm, username: HeaderParser.Username, algorithm: HeaderParser.Algorithm, nonce: HeaderParser.Nonce, response: HeaderParser.Response, nc: HeaderParser.NC, cnonce: HeaderParser.CNonce, qop: HeaderParser.Qop},
             "Supported": HeaderParser.SpaceSeparated,
             "Allow-Events": HeaderParser.SpaceSeparated,
             "Call-ID": HeaderParser.CallID,
@@ -63,8 +63,14 @@ const HeaderParser = {
     
     Expires:(str) => {
         if(str.indexOf("expires=") > -1){
-            return str.match(/expires=(.*)/)[1];
+            var v = str.match(/expires=(.*)/)[1];
+            var n = parseInt(v,10);
+            return Number.isNaN(n) ? v : n;
         }else{
+            var trimmed = String(str).trim();
+            if(/^\d+$/.test(trimmed)){
+                return parseInt(trimmed,10);
+            }
             return false;
         }
     },
@@ -132,21 +138,47 @@ const HeaderParser = {
         return HeaderParser.FindKey(str, "response");
     },
 
+    NC:(str) => {
+        return HeaderParser.FindKey(str, "nc");
+    },
+
+    CNonce:(str) => {
+        return HeaderParser.FindKey(str, "cnonce");
+    },
+
     Transport:(str) => {
         return HeaderParser.FindKey(str, "transport");
     },
 
     URI: (str) => {
-        var regex = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::(\d+))?/;
-        var match = str.match(regex);
-        if (match !== null) {
-            return {
-                ip: match[1],
-                port: match[2] ? match[2] : null,
-            };
-        } else {
-            return false;
+        if (typeof str !== 'string' || !str.trim()) return false;
+        let candidate = str;
+        const sipMatch = str.match(/sip:([^;>\s]+)/i);
+        if (sipMatch) candidate = sipMatch[1];
+        else {
+            const protoMatch = str.match(/\/(?:UDP|TCP)\s+([^;>\s]+)/i);
+            if (protoMatch) candidate = protoMatch[1];
         }
+        const atIndex = candidate.indexOf('@');
+        if (atIndex !== -1) candidate = candidate.slice(atIndex + 1);
+        candidate = candidate.split(/[;>]/)[0].trim();
+        if (!candidate) return false;
+
+        const ipv6Match = candidate.match(/^\[([^\]]+)\](?::(\d+))?$/);
+        if (ipv6Match) {
+            return { ip: ipv6Match[1], port: ipv6Match[2] || null };
+        }
+        const lastColon = candidate.lastIndexOf(':');
+        if (lastColon !== -1 && /^\d+$/.test(candidate.slice(lastColon + 1))) {
+            return {
+                ip: candidate.slice(0, lastColon),
+                port: candidate.slice(lastColon + 1),
+            };
+        }
+        if (/^[\w.:-]+$/.test(candidate)) {
+            return { ip: candidate, port: null };
+        }
+        return false;
     },
 
     Contact:(str) => {
@@ -158,10 +190,17 @@ const HeaderParser = {
         }
 
         if(match1 !== null){
-          ret.ip = HeaderParser.URI(match1[0]).ip;
-          ret.port = HeaderParser.URI(match1[0]).port;
+          let parsedUri = HeaderParser.URI(match1[0]);
+          if(parsedUri && parsedUri.ip){
+            ret.ip = parsedUri.ip;
+            ret.port = parsedUri.port;
+          }
         }else if(match2 !== null){
             ret.ip = match2[1];
+        }
+        var expiresMatch = str.match(/expires=(\d+)/i);
+        if(expiresMatch){
+            ret.expires = parseInt(expiresMatch[1],10);
         }
 
         return ret;

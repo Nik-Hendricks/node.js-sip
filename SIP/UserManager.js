@@ -13,6 +13,7 @@ class UserManager {
 
     User(props){
         let ret = {
+            name: props.name,
             extension: props.extension,
             ip: props.ip,
             port: props.port,

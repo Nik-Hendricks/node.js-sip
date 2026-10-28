@@ -8,7 +8,8 @@ const SIP = {
     TrunkManager: require('./TrunkManager.js'),
     UserManager: require('./UserManager.js'),
     IVRManager: require('./IVRManager.js'),
-    Router: require('./Router.js')
+    Router: require('./Router.js'),
+    Auth: require('./Auth.js')
 }
 
 module.exports = SIP;
