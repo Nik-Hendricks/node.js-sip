@@ -313,7 +313,7 @@ class Session{
             outbound_send_count: this.outbound_send_count,
             outbound_packet_count: this.outbound_packet_count,
             outbound_octet_count: this.outbound_octet_count,
-            outbound_target: `${this.sdp.match(/m=audio (\d+) RTP/)?.[0] || ''}`,
+            outbound_target: `${this.sdp.match(/c=IN IP4 ([0-9]+[.][0-9]+[.][0-9]+[.][0-9]+)/)?.[1] || '0.0.0.0'}:${this.sdp.match(/m=audio ([0-9]+) RTP/)?.[1] || 0}`,
             outbound_rtcp_port: this.outbound_rtcp_port,
         };
     }
